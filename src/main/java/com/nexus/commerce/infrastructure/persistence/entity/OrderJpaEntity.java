@@ -21,7 +21,10 @@ public class OrderJpaEntity {
     @Column(name = "auction_id")
     private String auctionId;
 
-    @ElementCollection
+    // EAGER: open-in-view is disabled, so the session is gone by the time the adapter maps
+    // this entity back to the domain Order -- a lazy collection would throw outside the
+    // transaction, and these lists are always small and always needed anyway.
+    @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "order_items", joinColumns = @JoinColumn(name = "order_id"))
     private List<OrderItemEmbeddable> items = new ArrayList<>();
 

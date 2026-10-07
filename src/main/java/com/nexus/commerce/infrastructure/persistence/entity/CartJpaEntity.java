@@ -17,7 +17,10 @@ public class CartJpaEntity {
     @Column(name = "buyer_id", nullable = false, unique = true)
     private String buyerId;
 
-    @ElementCollection
+    // EAGER: open-in-view is disabled, so the session is gone by the time the adapter maps
+    // this entity back to the domain Cart -- a lazy collection would throw outside the
+    // transaction, and these lists are always small and always needed anyway.
+    @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "cart_items", joinColumns = @JoinColumn(name = "cart_id"))
     private List<CartItemEmbeddable> items = new ArrayList<>();
 

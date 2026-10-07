@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -40,6 +41,7 @@ class OrderRepositoryAdapterTest {
     }
 
     @Autowired private OrderRepositoryAdapter adapter;
+    @Autowired private TestEntityManager entityManager;
 
     private Order newOrder(String buyerId, String auctionId) {
         return Order.create(buyerId, auctionId,
@@ -50,6 +52,9 @@ class OrderRepositoryAdapterTest {
     void save_thenFindById_roundTripsAllFields() {
         Order order = newOrder("buyer-1", null);
         adapter.save(order);
+        // See CartRepositoryAdapterTest for why flush+clear matters here.
+        entityManager.flush();
+        entityManager.clear();
 
         Optional<Order> reloaded = adapter.findById(order.getId());
 

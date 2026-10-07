@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -36,12 +37,19 @@ class CartRepositoryAdapterTest {
     }
 
     @Autowired private CartRepositoryAdapter adapter;
+    @Autowired private TestEntityManager entityManager;
 
     @Test
     void save_thenFindByBuyerId_roundTripsItems() {
         Cart cart = Cart.create("buyer-1")
                 .addItem(CartItem.create("product-1", "seller-1", "Laptop X", new BigDecimal("999.00"), 2));
         adapter.save(cart);
+        // Clears the persistence context so the read below hits a fresh proxy, the same way a
+        // real HTTP request would after open-in-view is disabled -- without this, a lazy
+        // @ElementCollection bug would stay hidden since @DataJpaTest keeps one session open
+        // for the whole test method.
+        entityManager.flush();
+        entityManager.clear();
 
         Optional<Cart> reloaded = adapter.findByBuyerId("buyer-1");
 
