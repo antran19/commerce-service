@@ -23,7 +23,7 @@
     <stripe.version>24.21.0</stripe.version>
     <!-- Version of the com.nexus:common-* artifacts published by the sibling
          common-libs project. 1.2.0 adds OrderCreated/OrderPaid/OrderCancelled events. -->
-    <common-libs.version>1.2.0</common-libs.version>
+    <common-libs.version>1.7.0</common-libs.version>
   </properties>
 
   <dependencyManagement>

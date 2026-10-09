@@ -17,7 +17,9 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class CancelOrderUseCaseTest {
@@ -47,6 +49,29 @@ class CancelOrderUseCaseTest {
         OrderResult result = useCase.cancel(order.getId(), "buyer-1");
 
         assertThat(result.status()).isEqualTo("CANCELLED");
+    }
+
+    @Test
+    void cancel_publishesTheOrdersAuctionIdWhenPresent() {
+        Order order = Order.create("buyer-1", "auction-1",
+                List.of(new OrderItem("product-1", "seller-1", "Laptop X", new BigDecimal("100.00"), 1)));
+        when(orderRepositoryPort.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+
+        useCase.cancel(order.getId(), "buyer-1");
+
+        verify(eventPublisherPort).publish(argThat(event ->
+                event instanceof com.nexus.common.events.OrderCancelledEvent e && "auction-1".equals(e.getAuctionId())));
+    }
+
+    @Test
+    void cancel_publishesNullAuctionIdForADirectPurchaseOrder() {
+        Order order = order();
+        when(orderRepositoryPort.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+
+        useCase.cancel(order.getId(), "buyer-1");
+
+        verify(eventPublisherPort).publish(argThat(event ->
+                event instanceof com.nexus.common.events.OrderCancelledEvent e && e.getAuctionId() == null));
     }
 
     @Test

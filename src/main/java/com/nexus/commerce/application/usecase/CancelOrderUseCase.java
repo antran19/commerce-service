@@ -8,6 +8,7 @@ import com.nexus.commerce.domain.model.OrderStatus;
 import com.nexus.common.core.exception.ConflictException;
 import com.nexus.common.core.exception.ForbiddenException;
 import com.nexus.common.events.OrderCancelledEvent;
+import org.springframework.transaction.annotation.Transactional;
 
 public class CancelOrderUseCase {
 
@@ -21,6 +22,9 @@ public class CancelOrderUseCase {
 
     // v1 scope: only the owning buyer can cancel, and only before payment -- cancelling a paid
     // order would require a real refund flow, which is deliberately out of scope for this pass.
+    // @Transactional is required here: findByIdForUpdate takes a PESSIMISTIC_WRITE lock, which
+    // Hibernate refuses to acquire outside an active transaction.
+    @Transactional
     public OrderResult cancel(String orderId, String callerId) {
         Order order = orderRepositoryPort.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
@@ -34,7 +38,7 @@ public class CancelOrderUseCase {
         }
 
         Order saved = orderRepositoryPort.save(order.cancel());
-        eventPublisherPort.publish(new OrderCancelledEvent(saved.getId(), "BUYER_REQUESTED"));
+        eventPublisherPort.publish(new OrderCancelledEvent(saved.getId(), "BUYER_REQUESTED", saved.getAuctionId()));
         return OrderResult.from(saved);
     }
 }
