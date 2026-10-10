@@ -7,6 +7,7 @@ import com.nexus.commerce.domain.model.Cart;
 import com.nexus.commerce.domain.model.CartItem;
 import com.nexus.commerce.domain.model.Order;
 import com.nexus.common.core.exception.ConflictException;
+import com.nexus.common.events.InventoryReservationRequestedEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -47,7 +48,21 @@ class StartCheckoutUseCaseTest {
         assertThat(result.auctionId()).isNull();
         assertThat(result.totalAmount()).isEqualByComparingTo("999.00");
         verify(cartRepositoryPort).save(argThat(Cart::isEmpty));
-        verify(eventPublisherPort).publish(any());
+        verify(eventPublisherPort, times(2)).publish(any());
+    }
+
+    @Test
+    void checkout_publishesAnInventoryReservationRequestWithOneLineItemPerProduct() {
+        Cart cart = Cart.create("buyer-1")
+                .addItem(CartItem.create("product-1", "seller-1", "Laptop X", new BigDecimal("999.00"), 2));
+        when(cartRepositoryPort.findByBuyerId("buyer-1")).thenReturn(Optional.of(cart));
+
+        useCase.checkout("buyer-1");
+
+        verify(eventPublisherPort).publish(argThat(e -> e instanceof InventoryReservationRequestedEvent evt
+                && evt.getItems().size() == 1
+                && evt.getItems().get(0).skuId().equals("product-1")
+                && evt.getItems().get(0).quantity() == 2));
     }
 
     @Test

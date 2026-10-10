@@ -72,4 +72,10 @@ public class UseCaseConfig {
                                                   EventPublisherPort eventPublisherPort) {
         return new CancelOrderUseCase(orderRepositoryPort, eventPublisherPort);
     }
+
+    @Bean
+    public CancelOrderDueToStockFailureUseCase cancelOrderDueToStockFailureUseCase(
+            OrderRepositoryPort orderRepositoryPort, EventPublisherPort eventPublisherPort) {
+        return new CancelOrderDueToStockFailureUseCase(orderRepositoryPort, eventPublisherPort);
+    }
 }
