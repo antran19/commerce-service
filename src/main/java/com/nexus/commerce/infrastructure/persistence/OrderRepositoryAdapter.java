@@ -42,6 +42,11 @@ public class OrderRepositoryAdapter implements OrderRepositoryPort {
     }
 
     @Override
+    public List<Order> findAll() {
+        return jpaRepository.findAllByOrderByCreatedAtDesc().stream().map(this::toDomain).toList();
+    }
+
+    @Override
     public Order save(Order order) {
         List<OrderItemEmbeddable> items = order.getItems().stream()
                 .map(i -> new OrderItemEmbeddable(i.getProductId(), i.getSellerId(), i.getProductName(),

@@ -89,6 +89,18 @@ class OrderRepositoryAdapterTest {
     }
 
     @Test
+    void findAll_returnsOrdersAcrossEveryBuyer() {
+        Order fromBuyerA = newOrder("buyer-4", null);
+        Order fromBuyerB = newOrder("buyer-5", null);
+        adapter.save(fromBuyerA);
+        adapter.save(fromBuyerB);
+
+        List<Order> orders = adapter.findAll();
+
+        assertThat(orders).extracting(Order::getId).contains(fromBuyerA.getId(), fromBuyerB.getId());
+    }
+
+    @Test
     void save_persistsPaidStatusAndPaidAt() {
         Order order = newOrder("buyer-3", null);
         adapter.save(order);

@@ -40,13 +40,21 @@ class OrderControllerTest {
     @MockBean private StartCheckoutUseCase startCheckoutUseCase;
     @MockBean private GetOrderUseCase getOrderUseCase;
     @MockBean private ListOrdersUseCase listOrdersUseCase;
+    @MockBean private ListAllOrdersUseCase listAllOrdersUseCase;
     @MockBean private CancelOrderUseCase cancelOrderUseCase;
     @MockBean private JwtTokenProvider jwtTokenProvider;
 
     private void authenticateAs(String subject, String... privileges) {
+        authenticateAsWithRole(subject, null, privileges);
+    }
+
+    private void authenticateAsWithRole(String subject, String role, String... privileges) {
         when(jwtTokenProvider.isValid("good-token")).thenReturn(true);
-        Claims claims = Jwts.claims().subject(subject).add("privileges", List.of(privileges)).build();
-        when(jwtTokenProvider.parseClaims("good-token")).thenReturn(claims);
+        var builder = Jwts.claims().subject(subject).add("privileges", List.of(privileges));
+        if (role != null) {
+            builder.add("role", role);
+        }
+        when(jwtTokenProvider.parseClaims("good-token")).thenReturn(builder.build());
     }
 
     private OrderResult sampleOrder() {
@@ -102,5 +110,41 @@ class OrderControllerTest {
         mockMvc.perform(post("/api/v1/orders/order-1/cancel").header("Authorization", "Bearer good-token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("CANCELLED"));
+    }
+
+    @Test
+    void listAllOrders_returns200ForAdmin() throws Exception {
+        authenticateAsWithRole("admin-1", "ADMIN", "ORDER.LIST");
+        when(listAllOrdersUseCase.list()).thenReturn(List.of(sampleOrder()));
+
+        mockMvc.perform(get("/api/v1/orders").header("Authorization", "Bearer good-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value("order-1"));
+    }
+
+    @Test
+    void listAllOrders_returns200ForSupportStaff() throws Exception {
+        authenticateAsWithRole("support-1", "SUPPORT_STAFF", "ORDER.LIST");
+        when(listAllOrdersUseCase.list()).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/orders").header("Authorization", "Bearer good-token"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void listAllOrders_returns403ForBuyerDespiteHoldingThePrivilege() throws Exception {
+        authenticateAsWithRole("buyer-1", "BUYER", "ORDER.LIST");
+
+        mockMvc.perform(get("/api/v1/orders").header("Authorization", "Bearer good-token"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("ORDER_LIST_ALL_FORBIDDEN"));
+    }
+
+    @Test
+    void listAllOrders_returns403WithoutThePrivilege() throws Exception {
+        authenticateAsWithRole("admin-1", "ADMIN");
+
+        mockMvc.perform(get("/api/v1/orders").header("Authorization", "Bearer good-token"))
+                .andExpect(status().isForbidden());
     }
 }

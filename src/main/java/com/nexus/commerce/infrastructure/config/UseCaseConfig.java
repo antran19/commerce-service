@@ -68,6 +68,11 @@ public class UseCaseConfig {
     }
 
     @Bean
+    public ListAllOrdersUseCase listAllOrdersUseCase(OrderRepositoryPort orderRepositoryPort) {
+        return new ListAllOrdersUseCase(orderRepositoryPort);
+    }
+
+    @Bean
     public CancelOrderUseCase cancelOrderUseCase(OrderRepositoryPort orderRepositoryPort,
                                                   EventPublisherPort eventPublisherPort) {
         return new CancelOrderUseCase(orderRepositoryPort, eventPublisherPort);

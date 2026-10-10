@@ -20,4 +20,6 @@ public interface OrderJpaRepository extends JpaRepository<OrderJpaEntity, UUID> 
     Optional<OrderJpaEntity> findByAuctionId(String auctionId);
 
     List<OrderJpaEntity> findByBuyerIdOrderByCreatedAtDesc(String buyerId);
+
+    List<OrderJpaEntity> findAllByOrderByCreatedAtDesc();
 }
