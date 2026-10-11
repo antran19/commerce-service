@@ -114,4 +114,29 @@ class OrderRepositoryAdapterTest {
         // compare truncated to the column's precision instead of exact equality.
         assertThat(reloaded.getPaidAt()).isCloseTo(paidAt, within(1, java.time.temporal.ChronoUnit.MILLIS));
     }
+
+    @Test
+    void findBySellerId_returnsOnlyOrdersContainingThatSellersItems() {
+        Order order = Order.create("buyer-7", null,
+                List.of(new OrderItem("product-1", "seller-target", "Widget", new BigDecimal("50.00"), 1)));
+        adapter.save(order);
+        Order other = newOrder("buyer-7", null);
+        adapter.save(other);
+
+        List<Order> orders = adapter.findBySellerId("seller-target");
+
+        assertThat(orders).extracting(Order::getId).containsExactly(order.getId());
+    }
+
+    @Test
+    void save_persistsShippedAt() {
+        Order order = newOrder("buyer-6", null).markPaid(Instant.now(), "pi_test");
+        adapter.save(order);
+        Instant shippedAt = Instant.now();
+
+        adapter.save(order.markShipped(shippedAt));
+
+        Order reloaded = adapter.findById(order.getId()).orElseThrow();
+        assertThat(reloaded.getShippedAt()).isCloseTo(shippedAt, within(1, java.time.temporal.ChronoUnit.MILLIS));
+    }
 }

@@ -5,5 +5,6 @@ import java.time.Instant;
 import java.util.List;
 
 public record OrderResponse(String id, String buyerId, String auctionId, List<OrderItemResponse> items,
-                             BigDecimal totalAmount, String status, Instant createdAt, Instant paidAt) {
+                             BigDecimal totalAmount, String status, Instant createdAt, Instant paidAt,
+                             Instant shippedAt) {
 }

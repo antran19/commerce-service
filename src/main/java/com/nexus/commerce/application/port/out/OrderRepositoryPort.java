@@ -10,6 +10,7 @@ public interface OrderRepositoryPort {
     Optional<Order> findByIdForUpdate(String id);
     Optional<Order> findByAuctionId(String auctionId);
     List<Order> findByBuyerId(String buyerId);
+    List<Order> findBySellerId(String sellerId);
     List<Order> findAll();
     Order save(Order order);
 }

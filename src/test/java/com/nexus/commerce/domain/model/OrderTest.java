@@ -61,6 +61,19 @@ class OrderTest {
     }
 
     @Test
+    void markShipped_setsShippedAt() {
+        Order order = Order.create("buyer-1", null,
+                        List.of(item("product-1", "seller-1", new BigDecimal("100.00"), 1)))
+                .markPaid(Instant.now(), "pi_123");
+        Instant now = Instant.now();
+
+        Order shipped = order.markShipped(now);
+
+        assertThat(shipped.getShippedAt()).isEqualTo(now);
+        assertThat(shipped.getStatus()).isEqualTo(OrderStatus.PAID);
+    }
+
+    @Test
     void cancel_setsStatusCancelled() {
         Order order = Order.create("buyer-1", null,
                 List.of(item("product-1", "seller-1", new BigDecimal("100.00"), 1)));

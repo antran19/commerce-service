@@ -21,5 +21,9 @@ public interface OrderJpaRepository extends JpaRepository<OrderJpaEntity, UUID> 
 
     List<OrderJpaEntity> findByBuyerIdOrderByCreatedAtDesc(String buyerId);
 
+    @Query("SELECT DISTINCT o FROM OrderJpaEntity o JOIN o.items i WHERE i.sellerId = :sellerId "
+            + "ORDER BY o.createdAt DESC")
+    List<OrderJpaEntity> findBySellerId(@Param("sellerId") String sellerId);
+
     List<OrderJpaEntity> findAllByOrderByCreatedAtDesc();
 }

@@ -5,15 +5,24 @@ import com.nexus.commerce.application.port.out.EventPublisherPort;
 import com.nexus.commerce.application.port.out.OrderRepositoryPort;
 import com.nexus.commerce.application.port.out.PaymentGatewayPort;
 import com.nexus.commerce.domain.model.Order;
+import com.nexus.commerce.domain.model.OrderItem;
 import com.nexus.commerce.domain.model.OrderStatus;
 import com.nexus.common.core.exception.ConflictException;
 import com.nexus.common.events.OrderRefundedEvent;
+import com.nexus.common.events.OrderReturnReceivedEvent;
+import com.nexus.common.events.ReservationLineItem;
 import org.springframework.transaction.annotation.Transactional;
 
-// ORDER.REFUND (Admin/Support Staff only, per the SRS privilege table). Money only -- the
-// physical goods are a separate, manual concern (see Order.refund() and HANDOFF.md): this
-// service has no shipment tracking yet, so it can't safely decide on its own whether the
-// item should go back into stock.
+import java.util.List;
+
+// ORDER.REFUND (Admin/Support Staff only, per the SRS privilege table). Money always; goods
+// depend on shippedAt: an order that never shipped has its reservation already COMMITTED
+// (not just held) by the time it's PAID -- commit() permanently removes the stock from
+// total_quantity, so a plain release can't undo it (ReleaseReservationUseCase only ever
+// un-reserves a still-PENDING hold). Putting stock back needs the same restock path the
+// manual Return flow uses (OrderReturnReceivedEvent -> IntakeInventoryUseCase), published
+// immediately here since there's nothing left to confirm. An already-shipped order's goods
+// stay manual -- see ReturnRequest/ReceiveReturnUseCase.
 public class RefundOrderUseCase {
 
     private final OrderRepositoryPort orderRepositoryPort;
@@ -44,8 +53,16 @@ public class RefundOrderUseCase {
         paymentGatewayPort.refund(order.getPaymentReference());
 
         Order saved = orderRepositoryPort.save(order.refund());
+        boolean shipped = saved.getShippedAt() != null;
         eventPublisherPort.publish(new OrderRefundedEvent(saved.getId(), saved.getBuyerId(), saved.getTotalAmount(),
-                reason));
+                reason, shipped));
+        if (!shipped) {
+            eventPublisherPort.publish(new OrderReturnReceivedEvent(saved.getId(), toLineItems(saved.getItems())));
+        }
         return OrderResult.from(saved);
+    }
+
+    private static List<ReservationLineItem> toLineItems(List<OrderItem> items) {
+        return items.stream().map(i -> new ReservationLineItem(i.getProductId(), i.getQuantity())).toList();
     }
 }

@@ -18,9 +18,15 @@ public class Order {
     // The Stripe PaymentIntent id behind this order's payment -- null until markPaid, needed
     // later to refund the exact charge (see RefundOrderUseCase).
     private final String paymentReference;
+    // Set by the Seller via markShipped -- there's no real carrier/tracking integration, just
+    // a manual "I shipped this" flag. Lets RefundOrderUseCase decide whether it's still safe
+    // to auto-release the reservation (not shipped yet) or whether goods handling needs the
+    // manual Return flow instead (see ReturnRequest).
+    private final Instant shippedAt;
 
     private Order(String id, String buyerId, String auctionId, List<OrderItem> items, BigDecimal totalAmount,
-                   OrderStatus status, Instant createdAt, Instant paidAt, String paymentReference) {
+                   OrderStatus status, Instant createdAt, Instant paidAt, String paymentReference,
+                   Instant shippedAt) {
         this.id = id;
         this.buyerId = buyerId;
         this.auctionId = auctionId;
@@ -30,6 +36,7 @@ public class Order {
         this.createdAt = createdAt;
         this.paidAt = paidAt;
         this.paymentReference = paymentReference;
+        this.shippedAt = shippedAt;
     }
 
     // auctionId is null for a direct-purchase (cart/checkout) order; set when the order was
@@ -37,32 +44,37 @@ public class Order {
     public static Order create(String buyerId, String auctionId, List<OrderItem> items) {
         BigDecimal total = items.stream().map(OrderItem::subtotal).reduce(BigDecimal.ZERO, BigDecimal::add);
         return new Order(UUID.randomUUID().toString(), buyerId, auctionId, List.copyOf(items), total,
-                OrderStatus.AWAITING_PAYMENT, Instant.now(), null, null);
+                OrderStatus.AWAITING_PAYMENT, Instant.now(), null, null, null);
     }
 
     public static Order reconstitute(String id, String buyerId, String auctionId, List<OrderItem> items,
                                       BigDecimal totalAmount, OrderStatus status, Instant createdAt, Instant paidAt,
-                                      String paymentReference) {
+                                      String paymentReference, Instant shippedAt) {
         return new Order(id, buyerId, auctionId, List.copyOf(items), totalAmount, status, createdAt, paidAt,
-                paymentReference);
+                paymentReference, shippedAt);
     }
 
     public Order markPaid(Instant when, String paymentReference) {
         return new Order(id, buyerId, auctionId, items, totalAmount, OrderStatus.PAID, createdAt, when,
-                paymentReference);
+                paymentReference, shippedAt);
     }
 
     public Order cancel() {
         return new Order(id, buyerId, auctionId, items, totalAmount, OrderStatus.CANCELLED, createdAt, paidAt,
-                paymentReference);
+                paymentReference, shippedAt);
     }
 
-    // Money only -- whether the physical goods come back to stock is a separate, manual
-    // decision (see HANDOFF.md): this service has no shipment tracking yet to know whether
-    // the item ever left the warehouse, so it can't safely automate that part.
+    // Money only -- whether the physical goods come back to stock is decided separately: see
+    // RefundOrderUseCase (auto-release if shippedAt is still null) and ReturnRequest (manual
+    // restock once a shipped item is confirmed received back).
     public Order refund() {
         return new Order(id, buyerId, auctionId, items, totalAmount, OrderStatus.REFUNDED, createdAt, paidAt,
-                paymentReference);
+                paymentReference, shippedAt);
+    }
+
+    public Order markShipped(Instant when) {
+        return new Order(id, buyerId, auctionId, items, totalAmount, status, createdAt, paidAt, paymentReference,
+                when);
     }
 
     // Null when the order spans items from more than one seller (a direct-purchase cart can
@@ -83,4 +95,5 @@ public class Order {
     public Instant getCreatedAt() { return createdAt; }
     public Instant getPaidAt() { return paidAt; }
     public String getPaymentReference() { return paymentReference; }
+    public Instant getShippedAt() { return shippedAt; }
 }

@@ -8,6 +8,7 @@ import com.nexus.commerce.domain.model.Order;
 import com.nexus.commerce.domain.model.OrderItem;
 import com.nexus.common.core.exception.ConflictException;
 import com.nexus.common.events.OrderRefundedEvent;
+import com.nexus.common.events.OrderReturnReceivedEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -53,7 +54,45 @@ class RefundOrderUseCaseTest {
         assertThat(result.status()).isEqualTo("REFUNDED");
         verify(paymentGatewayPort).refund("pi_123");
         verify(eventPublisherPort).publish(argThat(e -> e instanceof OrderRefundedEvent evt
-                && evt.getOrderId().equals(order.getId()) && evt.getReason().equals("Customer requested refund")));
+                && evt.getOrderId().equals(order.getId()) && evt.getReason().equals("Customer requested refund")
+                && !evt.isShipped()));
+    }
+
+    @Test
+    void refund_publishesShippedTrueWhenOrderHadAlreadyShipped() {
+        Order order = paidOrder().markShipped(Instant.now());
+        when(orderRepositoryPort.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+
+        useCase.refund(order.getId(), "reason");
+
+        verify(eventPublisherPort).publish(argThat(e -> e instanceof OrderRefundedEvent evt && evt.isShipped()));
+    }
+
+    @Test
+    void refund_restocksImmediatelyWhenOrderHadNotShipped() {
+        // Reservation.commit() (fired on OrderPaid) already removed the stock from total_quantity
+        // entirely -- ReleaseReservationUseCase can't undo that (it only ever un-reserves a still-
+        // PENDING hold). The only correct way to put stock back is the same restock path the
+        // manual Return flow uses: publish OrderReturnReceivedEvent so fulfillment-service intakes
+        // it again. See ReceiveReturnUseCase for the shipped-order equivalent.
+        Order order = paidOrder();
+        when(orderRepositoryPort.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+
+        useCase.refund(order.getId(), "reason");
+
+        verify(eventPublisherPort).publish(argThat(e -> e instanceof OrderReturnReceivedEvent evt
+                && evt.getOrderId().equals(order.getId()) && evt.getItems().size() == 1
+                && evt.getItems().get(0).skuId().equals("product-1") && evt.getItems().get(0).quantity() == 1));
+    }
+
+    @Test
+    void refund_doesNotRestockWhenOrderHadAlreadyShipped() {
+        Order order = paidOrder().markShipped(Instant.now());
+        when(orderRepositoryPort.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+
+        useCase.refund(order.getId(), "reason");
+
+        verify(eventPublisherPort, never()).publish(any(OrderReturnReceivedEvent.class));
     }
 
     @Test

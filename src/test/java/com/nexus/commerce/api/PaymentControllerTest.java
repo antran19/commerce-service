@@ -71,7 +71,7 @@ class PaymentControllerTest {
         authenticateAs("buyer-1", "CHECKOUT.START");
         when(confirmPaymentUseCase.confirm("order-1", "buyer-1", "sess-1"))
                 .thenReturn(new OrderResult("order-1", "buyer-1", null, List.of(), new BigDecimal("150.00"),
-                        "PAID", Instant.now(), Instant.now()));
+                        "PAID", Instant.now(), Instant.now(), null));
 
         mockMvc.perform(post("/api/v1/orders/order-1/confirm-payment")
                         .header("Authorization", "Bearer good-token")

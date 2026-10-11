@@ -4,6 +4,7 @@ import com.nexus.commerce.application.port.out.CartRepositoryPort;
 import com.nexus.commerce.application.port.out.EventPublisherPort;
 import com.nexus.commerce.application.port.out.OrderRepositoryPort;
 import com.nexus.commerce.application.port.out.PaymentGatewayPort;
+import com.nexus.commerce.application.port.out.ReturnRequestRepositoryPort;
 import com.nexus.commerce.application.usecase.*;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -80,6 +81,16 @@ public class UseCaseConfig {
     }
 
     @Bean
+    public ListOrdersSellingUseCase listOrdersSellingUseCase(OrderRepositoryPort orderRepositoryPort) {
+        return new ListOrdersSellingUseCase(orderRepositoryPort);
+    }
+
+    @Bean
+    public MarkOrderShippedUseCase markOrderShippedUseCase(OrderRepositoryPort orderRepositoryPort) {
+        return new MarkOrderShippedUseCase(orderRepositoryPort);
+    }
+
+    @Bean
     public CancelOrderUseCase cancelOrderUseCase(OrderRepositoryPort orderRepositoryPort,
                                                   EventPublisherPort eventPublisherPort) {
         return new CancelOrderUseCase(orderRepositoryPort, eventPublisherPort);
@@ -89,5 +100,23 @@ public class UseCaseConfig {
     public CancelOrderDueToStockFailureUseCase cancelOrderDueToStockFailureUseCase(
             OrderRepositoryPort orderRepositoryPort, EventPublisherPort eventPublisherPort) {
         return new CancelOrderDueToStockFailureUseCase(orderRepositoryPort, eventPublisherPort);
+    }
+
+    @Bean
+    public CreateReturnRequestUseCase createReturnRequestUseCase(OrderRepositoryPort orderRepositoryPort,
+                                                                    ReturnRequestRepositoryPort returnRequestRepositoryPort) {
+        return new CreateReturnRequestUseCase(orderRepositoryPort, returnRequestRepositoryPort);
+    }
+
+    @Bean
+    public ReceiveReturnUseCase receiveReturnUseCase(ReturnRequestRepositoryPort returnRequestRepositoryPort,
+                                                        OrderRepositoryPort orderRepositoryPort,
+                                                        EventPublisherPort eventPublisherPort) {
+        return new ReceiveReturnUseCase(returnRequestRepositoryPort, orderRepositoryPort, eventPublisherPort);
+    }
+
+    @Bean
+    public RejectReturnUseCase rejectReturnUseCase(ReturnRequestRepositoryPort returnRequestRepositoryPort) {
+        return new RejectReturnUseCase(returnRequestRepositoryPort);
     }
 }

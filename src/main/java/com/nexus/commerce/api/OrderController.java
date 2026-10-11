@@ -29,18 +29,24 @@ public class OrderController {
     private final GetOrderUseCase getOrderUseCase;
     private final ListOrdersUseCase listOrdersUseCase;
     private final ListAllOrdersUseCase listAllOrdersUseCase;
+    private final ListOrdersSellingUseCase listOrdersSellingUseCase;
+    private final MarkOrderShippedUseCase markOrderShippedUseCase;
     private final CancelOrderUseCase cancelOrderUseCase;
     private final RefundOrderUseCase refundOrderUseCase;
     private final CommerceApiMapper mapper;
 
     public OrderController(StartCheckoutUseCase startCheckoutUseCase, GetOrderUseCase getOrderUseCase,
                             ListOrdersUseCase listOrdersUseCase, ListAllOrdersUseCase listAllOrdersUseCase,
+                            ListOrdersSellingUseCase listOrdersSellingUseCase,
+                            MarkOrderShippedUseCase markOrderShippedUseCase,
                             CancelOrderUseCase cancelOrderUseCase, RefundOrderUseCase refundOrderUseCase,
                             CommerceApiMapper mapper) {
         this.startCheckoutUseCase = startCheckoutUseCase;
         this.getOrderUseCase = getOrderUseCase;
         this.listOrdersUseCase = listOrdersUseCase;
         this.listAllOrdersUseCase = listAllOrdersUseCase;
+        this.listOrdersSellingUseCase = listOrdersSellingUseCase;
+        this.markOrderShippedUseCase = markOrderShippedUseCase;
         this.cancelOrderUseCase = cancelOrderUseCase;
         this.refundOrderUseCase = refundOrderUseCase;
         this.mapper = mapper;
@@ -70,6 +76,22 @@ public class OrderController {
         }
         List<OrderResponse> results = listAllOrdersUseCase.list().stream().map(mapper::toResponse).toList();
         return ResponseEntity.ok(ApiResponse.ok(results));
+    }
+
+    @RequiresPrivilege("ORDER.LIST")
+    @GetMapping("/orders/selling")
+    public ResponseEntity<ApiResponse<List<OrderResponse>>> listOrdersSelling(Authentication authentication) {
+        List<OrderResponse> results = listOrdersSellingUseCase.listForSeller(buyerId(authentication))
+                .stream().map(mapper::toResponse).toList();
+        return ResponseEntity.ok(ApiResponse.ok(results));
+    }
+
+    @RequiresPrivilege("ORDER.MARK_SHIPPED")
+    @PostMapping("/orders/{orderId}/mark-shipped")
+    public ResponseEntity<ApiResponse<OrderResponse>> markOrderShipped(Authentication authentication,
+                                                                          @PathVariable String orderId) {
+        OrderResult result = markOrderShippedUseCase.markShipped(orderId, buyerId(authentication));
+        return ResponseEntity.ok(ApiResponse.ok(mapper.toResponse(result)));
     }
 
     @RequiresPrivilege("ORDER.VIEW")

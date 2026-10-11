@@ -42,6 +42,8 @@ class OrderControllerTest {
     @MockBean private GetOrderUseCase getOrderUseCase;
     @MockBean private ListOrdersUseCase listOrdersUseCase;
     @MockBean private ListAllOrdersUseCase listAllOrdersUseCase;
+    @MockBean private ListOrdersSellingUseCase listOrdersSellingUseCase;
+    @MockBean private MarkOrderShippedUseCase markOrderShippedUseCase;
     @MockBean private CancelOrderUseCase cancelOrderUseCase;
     @MockBean private RefundOrderUseCase refundOrderUseCase;
     @MockBean private JwtTokenProvider jwtTokenProvider;
@@ -61,7 +63,7 @@ class OrderControllerTest {
 
     private OrderResult sampleOrder() {
         return new OrderResult("order-1", "buyer-1", null, List.of(), new BigDecimal("150.00"),
-                "AWAITING_PAYMENT", Instant.now(), null);
+                "AWAITING_PAYMENT", Instant.now(), null, null);
     }
 
     @Test
@@ -107,7 +109,7 @@ class OrderControllerTest {
         authenticateAs("buyer-1", "ORDER.CANCEL");
         when(cancelOrderUseCase.cancel("order-1", "buyer-1")).thenReturn(
                 new OrderResult("order-1", "buyer-1", null, List.of(), new BigDecimal("150.00"),
-                        "CANCELLED", Instant.now(), null));
+                        "CANCELLED", Instant.now(), null, null));
 
         mockMvc.perform(post("/api/v1/orders/order-1/cancel").header("Authorization", "Bearer good-token"))
                 .andExpect(status().isOk())
@@ -155,7 +157,7 @@ class OrderControllerTest {
         authenticateAsWithRole("admin-1", "ADMIN", "ORDER.REFUND");
         when(refundOrderUseCase.refund("order-1", "Customer requested refund")).thenReturn(
                 new OrderResult("order-1", "buyer-1", null, List.of(), new BigDecimal("150.00"),
-                        "REFUNDED", Instant.now(), Instant.now()));
+                        "REFUNDED", Instant.now(), Instant.now(), null));
 
         mockMvc.perform(post("/api/v1/orders/order-1/refund")
                         .header("Authorization", "Bearer good-token")
@@ -175,6 +177,44 @@ class OrderControllerTest {
                         .contentType(APPLICATION_JSON)
                         .content("""
                                 {"reason":"Customer requested refund"}"""))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void listOrdersSelling_returns200ForSeller() throws Exception {
+        authenticateAsWithRole("seller-1", "SELLER", "ORDER.LIST");
+        when(listOrdersSellingUseCase.listForSeller("seller-1")).thenReturn(List.of(sampleOrder()));
+
+        mockMvc.perform(get("/api/v1/orders/selling").header("Authorization", "Bearer good-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value("order-1"));
+    }
+
+    @Test
+    void listOrdersSelling_returns403WithoutPrivilege() throws Exception {
+        authenticateAsWithRole("seller-1", "SELLER");
+
+        mockMvc.perform(get("/api/v1/orders/selling").header("Authorization", "Bearer good-token"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void markOrderShipped_returns200ForSeller() throws Exception {
+        authenticateAsWithRole("seller-1", "SELLER", "ORDER.MARK_SHIPPED");
+        when(markOrderShippedUseCase.markShipped("order-1", "seller-1")).thenReturn(
+                new OrderResult("order-1", "buyer-1", null, List.of(), new BigDecimal("150.00"),
+                        "PAID", Instant.now(), Instant.now(), Instant.now()));
+
+        mockMvc.perform(post("/api/v1/orders/order-1/mark-shipped").header("Authorization", "Bearer good-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("PAID"));
+    }
+
+    @Test
+    void markOrderShipped_returns403WithoutPrivilege() throws Exception {
+        authenticateAsWithRole("seller-1", "SELLER");
+
+        mockMvc.perform(post("/api/v1/orders/order-1/mark-shipped").header("Authorization", "Bearer good-token"))
                 .andExpect(status().isForbidden());
     }
 
