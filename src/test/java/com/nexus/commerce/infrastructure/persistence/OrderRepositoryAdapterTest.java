@@ -106,7 +106,7 @@ class OrderRepositoryAdapterTest {
         adapter.save(order);
         Instant paidAt = Instant.now();
 
-        adapter.save(order.markPaid(paidAt));
+        adapter.save(order.markPaid(paidAt, "pi_test"));
 
         Order reloaded = adapter.findById(order.getId()).orElseThrow();
         assertThat(reloaded.getStatus()).isEqualTo(OrderStatus.PAID);

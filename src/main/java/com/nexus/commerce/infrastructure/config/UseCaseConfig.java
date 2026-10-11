@@ -58,6 +58,13 @@ public class UseCaseConfig {
     }
 
     @Bean
+    public RefundOrderUseCase refundOrderUseCase(OrderRepositoryPort orderRepositoryPort,
+                                                   PaymentGatewayPort paymentGatewayPort,
+                                                   EventPublisherPort eventPublisherPort) {
+        return new RefundOrderUseCase(orderRepositoryPort, paymentGatewayPort, eventPublisherPort);
+    }
+
+    @Bean
     public GetOrderUseCase getOrderUseCase(OrderRepositoryPort orderRepositoryPort) {
         return new GetOrderUseCase(orderRepositoryPort);
     }

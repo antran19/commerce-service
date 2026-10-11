@@ -2,7 +2,9 @@ package com.nexus.commerce.infrastructure.payment;
 
 import com.nexus.commerce.application.port.out.PaymentGatewayPort;
 import com.stripe.exception.StripeException;
+import com.stripe.model.Refund;
 import com.stripe.model.checkout.Session;
+import com.stripe.param.RefundCreateParams;
 import com.stripe.param.checkout.SessionCreateParams;
 import org.springframework.stereotype.Component;
 
@@ -58,9 +60,18 @@ public class StripePaymentGatewayAdapter implements PaymentGatewayPort {
             boolean paid = "paid".equals(session.getPaymentStatus());
             String orderId = session.getMetadata() == null ? null : session.getMetadata().get("orderId");
             String buyerId = session.getMetadata() == null ? null : session.getMetadata().get("buyerId");
-            return new PaymentStatus(paid, orderId, buyerId);
+            return new PaymentStatus(paid, orderId, buyerId, session.getPaymentIntent());
         } catch (StripeException e) {
             throw new PaymentGatewayException("Failed to retrieve Stripe checkout session " + sessionId, e);
+        }
+    }
+
+    @Override
+    public void refund(String paymentReference) {
+        try {
+            Refund.create(RefundCreateParams.builder().setPaymentIntent(paymentReference).build());
+        } catch (StripeException e) {
+            throw new PaymentGatewayException("Failed to refund Stripe payment " + paymentReference, e);
         }
     }
 }

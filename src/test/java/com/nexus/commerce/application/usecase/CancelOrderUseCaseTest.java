@@ -85,7 +85,7 @@ class CancelOrderUseCaseTest {
 
     @Test
     void cancel_rejectsAlreadyPaidOrder() {
-        Order order = order().markPaid(Instant.now());
+        Order order = order().markPaid(Instant.now(), "pi_test");
         when(orderRepositoryPort.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
 
         assertThatThrownBy(() -> useCase.cancel(order.getId(), "buyer-1"))

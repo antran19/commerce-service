@@ -54,7 +54,7 @@ public class OrderRepositoryAdapter implements OrderRepositoryPort {
                 .toList();
         OrderJpaEntity entity = new OrderJpaEntity(UUID.fromString(order.getId()), order.getBuyerId(),
                 order.getAuctionId(), items, order.getTotalAmount(), order.getStatus().name(),
-                order.getCreatedAt(), order.getPaidAt());
+                order.getCreatedAt(), order.getPaidAt(), order.getPaymentReference());
         jpaRepository.save(entity);
         return order;
     }
@@ -66,6 +66,6 @@ public class OrderRepositoryAdapter implements OrderRepositoryPort {
                 .toList();
         return Order.reconstitute(entity.getId().toString(), entity.getBuyerId(), entity.getAuctionId(), items,
                 entity.getTotalAmount(), OrderStatus.valueOf(entity.getStatus()), entity.getCreatedAt(),
-                entity.getPaidAt());
+                entity.getPaidAt(), entity.getPaymentReference());
     }
 }

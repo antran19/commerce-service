@@ -43,7 +43,7 @@ class CancelOrderDueToStockFailureUseCaseTest {
 
     @Test
     void cancel_isANoOpWhenOrderIsAlreadyPaid() {
-        Order paid = order(null).markPaid(Instant.now());
+        Order paid = order(null).markPaid(Instant.now(), "pi_test");
         when(orderRepositoryPort.findByIdForUpdate(paid.getId())).thenReturn(Optional.of(paid));
 
         useCase.cancel(paid.getId(), "OUT_OF_STOCK");

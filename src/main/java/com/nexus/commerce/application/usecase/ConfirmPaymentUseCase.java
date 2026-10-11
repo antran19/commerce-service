@@ -53,7 +53,7 @@ public class ConfirmPaymentUseCase {
                     "This payment session does not belong to this order/buyer");
         }
 
-        Order saved = orderRepositoryPort.save(order.markPaid(Instant.now()));
+        Order saved = orderRepositoryPort.save(order.markPaid(Instant.now(), paymentStatus.paymentReference()));
         eventPublisherPort.publish(new OrderPaidEvent(saved.getId(), saved.getAuctionId(), saved.getBuyerId(),
                 saved.singleSellerIdOrNull(), saved.getTotalAmount(), saved.getPaidAt()));
         return OrderResult.from(saved);

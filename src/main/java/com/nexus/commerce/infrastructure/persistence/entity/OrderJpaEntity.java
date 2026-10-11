@@ -40,11 +40,15 @@ public class OrderJpaEntity {
     @Column(name = "paid_at")
     private Instant paidAt;
 
+    @Column(name = "payment_reference")
+    private String paymentReference;
+
     protected OrderJpaEntity() {
     }
 
     public OrderJpaEntity(UUID id, String buyerId, String auctionId, List<OrderItemEmbeddable> items,
-                           BigDecimal totalAmount, String status, Instant createdAt, Instant paidAt) {
+                           BigDecimal totalAmount, String status, Instant createdAt, Instant paidAt,
+                           String paymentReference) {
         this.id = id;
         this.buyerId = buyerId;
         this.auctionId = auctionId;
@@ -53,6 +57,7 @@ public class OrderJpaEntity {
         this.status = status;
         this.createdAt = createdAt;
         this.paidAt = paidAt;
+        this.paymentReference = paymentReference;
     }
 
     public UUID getId() { return id; }
@@ -63,4 +68,5 @@ public class OrderJpaEntity {
     public String getStatus() { return status; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getPaidAt() { return paidAt; }
+    public String getPaymentReference() { return paymentReference; }
 }

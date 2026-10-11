@@ -24,6 +24,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.mockito.Mockito.when;
+import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -42,6 +43,7 @@ class OrderControllerTest {
     @MockBean private ListOrdersUseCase listOrdersUseCase;
     @MockBean private ListAllOrdersUseCase listAllOrdersUseCase;
     @MockBean private CancelOrderUseCase cancelOrderUseCase;
+    @MockBean private RefundOrderUseCase refundOrderUseCase;
     @MockBean private JwtTokenProvider jwtTokenProvider;
 
     private void authenticateAs(String subject, String... privileges) {
@@ -146,5 +148,48 @@ class OrderControllerTest {
 
         mockMvc.perform(get("/api/v1/orders").header("Authorization", "Bearer good-token"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void refundOrder_returns200ForAdmin() throws Exception {
+        authenticateAsWithRole("admin-1", "ADMIN", "ORDER.REFUND");
+        when(refundOrderUseCase.refund("order-1", "Customer requested refund")).thenReturn(
+                new OrderResult("order-1", "buyer-1", null, List.of(), new BigDecimal("150.00"),
+                        "REFUNDED", Instant.now(), Instant.now()));
+
+        mockMvc.perform(post("/api/v1/orders/order-1/refund")
+                        .header("Authorization", "Bearer good-token")
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"reason":"Customer requested refund"}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("REFUNDED"));
+    }
+
+    @Test
+    void refundOrder_returns403ForBuyer() throws Exception {
+        authenticateAsWithRole("buyer-1", "BUYER", "ORDER.VIEW");
+
+        mockMvc.perform(post("/api/v1/orders/order-1/refund")
+                        .header("Authorization", "Bearer good-token")
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"reason":"Customer requested refund"}"""))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void refundOrder_returns409WhenNotRefundable() throws Exception {
+        authenticateAsWithRole("admin-1", "ADMIN", "ORDER.REFUND");
+        when(refundOrderUseCase.refund("order-1", "reason"))
+                .thenThrow(new ConflictException("ORDER_NOT_REFUNDABLE", "Order order-1 is not in a refundable state"));
+
+        mockMvc.perform(post("/api/v1/orders/order-1/refund")
+                        .header("Authorization", "Bearer good-token")
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"reason":"reason"}"""))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("ORDER_NOT_REFUNDABLE"));
     }
 }

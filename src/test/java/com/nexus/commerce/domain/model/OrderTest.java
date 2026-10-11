@@ -35,15 +35,29 @@ class OrderTest {
     }
 
     @Test
-    void markPaid_setsStatusAndPaidAt() {
+    void markPaid_setsStatusPaidAtAndPaymentReference() {
         Order order = Order.create("buyer-1", null,
                 List.of(item("product-1", "seller-1", new BigDecimal("100.00"), 1)));
         Instant now = Instant.now();
 
-        Order paid = order.markPaid(now);
+        Order paid = order.markPaid(now, "pi_123");
 
         assertThat(paid.getStatus()).isEqualTo(OrderStatus.PAID);
         assertThat(paid.getPaidAt()).isEqualTo(now);
+        assertThat(paid.getPaymentReference()).isEqualTo("pi_123");
+    }
+
+    @Test
+    void refund_setsStatusRefundedAndKeepsPaymentReference() {
+        Order order = Order.create("buyer-1", null,
+                        List.of(item("product-1", "seller-1", new BigDecimal("100.00"), 1)))
+                .markPaid(Instant.now(), "pi_123");
+
+        Order refunded = order.refund();
+
+        assertThat(refunded.getStatus()).isEqualTo(OrderStatus.REFUNDED);
+        assertThat(refunded.getPaymentReference()).isEqualTo("pi_123");
+        assertThat(refunded.getPaidAt()).isEqualTo(order.getPaidAt());
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.nexus.commerce.api;
 
+import com.nexus.commerce.api.dto.request.RefundOrderRequest;
 import com.nexus.commerce.api.dto.response.OrderResponse;
 import com.nexus.commerce.api.mapper.CommerceApiMapper;
 import com.nexus.commerce.application.usecase.*;
@@ -7,6 +8,7 @@ import com.nexus.common.core.ApiResponse;
 import com.nexus.common.core.exception.ForbiddenException;
 import com.nexus.common.security.RequiresPrivilege;
 import com.nexus.common.security.TokenDetails;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -28,16 +30,19 @@ public class OrderController {
     private final ListOrdersUseCase listOrdersUseCase;
     private final ListAllOrdersUseCase listAllOrdersUseCase;
     private final CancelOrderUseCase cancelOrderUseCase;
+    private final RefundOrderUseCase refundOrderUseCase;
     private final CommerceApiMapper mapper;
 
     public OrderController(StartCheckoutUseCase startCheckoutUseCase, GetOrderUseCase getOrderUseCase,
                             ListOrdersUseCase listOrdersUseCase, ListAllOrdersUseCase listAllOrdersUseCase,
-                            CancelOrderUseCase cancelOrderUseCase, CommerceApiMapper mapper) {
+                            CancelOrderUseCase cancelOrderUseCase, RefundOrderUseCase refundOrderUseCase,
+                            CommerceApiMapper mapper) {
         this.startCheckoutUseCase = startCheckoutUseCase;
         this.getOrderUseCase = getOrderUseCase;
         this.listOrdersUseCase = listOrdersUseCase;
         this.listAllOrdersUseCase = listAllOrdersUseCase;
         this.cancelOrderUseCase = cancelOrderUseCase;
+        this.refundOrderUseCase = refundOrderUseCase;
         this.mapper = mapper;
     }
 
@@ -79,6 +84,14 @@ public class OrderController {
     public ResponseEntity<ApiResponse<OrderResponse>> cancelOrder(Authentication authentication,
                                                                      @PathVariable String orderId) {
         OrderResult result = cancelOrderUseCase.cancel(orderId, buyerId(authentication));
+        return ResponseEntity.ok(ApiResponse.ok(mapper.toResponse(result)));
+    }
+
+    @RequiresPrivilege("ORDER.REFUND")
+    @PostMapping("/orders/{orderId}/refund")
+    public ResponseEntity<ApiResponse<OrderResponse>> refundOrder(@PathVariable String orderId,
+                                                                      @Valid @RequestBody RefundOrderRequest request) {
+        OrderResult result = refundOrderUseCase.refund(orderId, request.reason());
         return ResponseEntity.ok(ApiResponse.ok(mapper.toResponse(result)));
     }
 

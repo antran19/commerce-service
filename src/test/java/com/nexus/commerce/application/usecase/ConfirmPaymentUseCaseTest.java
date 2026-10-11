@@ -47,17 +47,18 @@ class ConfirmPaymentUseCaseTest {
         Order order = awaitingPaymentOrder();
         when(orderRepositoryPort.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
         when(paymentGatewayPort.retrieveSessionStatus("sess-1"))
-                .thenReturn(new PaymentGatewayPort.PaymentStatus(true, order.getId(), "buyer-1"));
+                .thenReturn(new PaymentGatewayPort.PaymentStatus(true, order.getId(), "buyer-1", "pi_test"));
 
         OrderResult result = useCase.confirm(order.getId(), "buyer-1", "sess-1");
 
         assertThat(result.status()).isEqualTo("PAID");
         verify(eventPublisherPort).publish(any());
+        verify(orderRepositoryPort).save(argThat(o -> "pi_test".equals(o.getPaymentReference())));
     }
 
     @Test
     void confirm_isIdempotentWhenAlreadyPaid() {
-        Order order = awaitingPaymentOrder().markPaid(Instant.now());
+        Order order = awaitingPaymentOrder().markPaid(Instant.now(), "pi_test");
         when(orderRepositoryPort.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
 
         OrderResult result = useCase.confirm(order.getId(), "buyer-1", "sess-1");
@@ -72,7 +73,7 @@ class ConfirmPaymentUseCaseTest {
         Order order = awaitingPaymentOrder();
         when(orderRepositoryPort.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
         when(paymentGatewayPort.retrieveSessionStatus("sess-1"))
-                .thenReturn(new PaymentGatewayPort.PaymentStatus(false, order.getId(), "buyer-1"));
+                .thenReturn(new PaymentGatewayPort.PaymentStatus(false, order.getId(), "buyer-1", "pi_test"));
 
         assertThatThrownBy(() -> useCase.confirm(order.getId(), "buyer-1", "sess-1"))
                 .isInstanceOf(ConflictException.class);
@@ -83,7 +84,7 @@ class ConfirmPaymentUseCaseTest {
         Order order = awaitingPaymentOrder();
         when(orderRepositoryPort.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
         when(paymentGatewayPort.retrieveSessionStatus("sess-1"))
-                .thenReturn(new PaymentGatewayPort.PaymentStatus(true, "some-other-order", "buyer-1"));
+                .thenReturn(new PaymentGatewayPort.PaymentStatus(true, "some-other-order", "buyer-1", "pi_test"));
 
         assertThatThrownBy(() -> useCase.confirm(order.getId(), "buyer-1", "sess-1"))
                 .isInstanceOf(ConflictException.class);

@@ -33,7 +33,8 @@ class CreateCheckoutSessionUseCaseTest {
         Order base = Order.create(buyerId, null,
                 List.of(new OrderItem("product-1", "seller-1", "Laptop X", new BigDecimal("100.00"), 1)));
         return Order.reconstitute(base.getId(), buyerId, null, base.getItems(), base.getTotalAmount(),
-                status, base.getCreatedAt(), status == OrderStatus.PAID ? Instant.now() : null);
+                status, base.getCreatedAt(), status == OrderStatus.PAID ? Instant.now() : null,
+                status == OrderStatus.PAID ? "pi_test" : null);
     }
 
     @BeforeEach
