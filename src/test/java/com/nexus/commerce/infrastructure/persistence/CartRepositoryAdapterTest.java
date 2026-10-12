@@ -75,4 +75,21 @@ class CartRepositoryAdapterTest {
     void findByBuyerId_returnsEmptyWhenNoCart() {
         assertThat(adapter.findByBuyerId("no-such-buyer")).isEmpty();
     }
+
+    @Test
+    void deleteInactiveSince_removesOnlyCartsNotTouchedSinceTheCutoff() {
+        java.time.Instant old = java.time.Instant.now().minus(java.time.Duration.ofDays(40));
+        CartItem item = CartItem.create("product-1", "seller-1", "Laptop X", new BigDecimal("10.00"), 1);
+        adapter.save(Cart.reconstitute(java.util.UUID.randomUUID().toString(), "buyer-stale",
+                java.util.List.of(item), old, old));
+        adapter.save(Cart.create("buyer-fresh").addItem(item));
+        entityManager.flush();
+        entityManager.clear();
+
+        int deleted = adapter.deleteInactiveSince(java.time.Instant.now().minus(java.time.Duration.ofDays(30)));
+
+        assertThat(deleted).isEqualTo(1);
+        assertThat(adapter.findByBuyerId("buyer-stale")).isEmpty();
+        assertThat(adapter.findByBuyerId("buyer-fresh")).isPresent();
+    }
 }

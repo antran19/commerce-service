@@ -6,6 +6,7 @@ import com.nexus.commerce.application.port.out.OrderRepositoryPort;
 import com.nexus.commerce.application.port.out.PaymentGatewayPort;
 import com.nexus.commerce.application.port.out.ReturnRequestRepositoryPort;
 import com.nexus.commerce.application.usecase.*;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -118,5 +119,12 @@ public class UseCaseConfig {
     @Bean
     public RejectReturnUseCase rejectReturnUseCase(ReturnRequestRepositoryPort returnRequestRepositoryPort) {
         return new RejectReturnUseCase(returnRequestRepositoryPort);
+    }
+
+    @Bean
+    public ExpireInactiveCartsUseCase expireInactiveCartsUseCase(
+            CartRepositoryPort cartRepositoryPort,
+            @Value("${nexus.cart.max-inactive-days:30}") long maxInactiveDays) {
+        return new ExpireInactiveCartsUseCase(cartRepositoryPort, java.time.Duration.ofDays(maxInactiveDays));
     }
 }

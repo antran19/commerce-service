@@ -41,6 +41,8 @@ nexus:
   payment:
     stripe:
       secret-key: ${STRIPE_SECRET_KEY:}
+  cart:
+    max-inactive-days: 30
 
 management:
   endpoints:

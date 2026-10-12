@@ -7,6 +7,7 @@ import com.nexus.commerce.infrastructure.persistence.entity.CartItemEmbeddable;
 import com.nexus.commerce.infrastructure.persistence.entity.CartJpaEntity;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -44,5 +45,10 @@ public class CartRepositoryAdapter implements CartRepositoryPort {
                 .toList();
         return Cart.reconstitute(entity.getId().toString(), entity.getBuyerId(), items,
                 entity.getCreatedAt(), entity.getUpdatedAt());
+    }
+
+    @Override
+    public int deleteInactiveSince(Instant cutoff) {
+        return jpaRepository.deleteByUpdatedAtBefore(cutoff);
     }
 }
