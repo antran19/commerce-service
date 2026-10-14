@@ -40,6 +40,7 @@ class OrderControllerTest {
 
     @MockBean private StartCheckoutUseCase startCheckoutUseCase;
     @MockBean private GetOrderUseCase getOrderUseCase;
+    @MockBean private GetOrderInvoiceUseCase getOrderInvoiceUseCase;
     @MockBean private ListOrdersUseCase listOrdersUseCase;
     @MockBean private ListAllOrdersUseCase listAllOrdersUseCase;
     @MockBean private ListOrdersSellingUseCase listOrdersSellingUseCase;
@@ -216,6 +217,48 @@ class OrderControllerTest {
 
         mockMvc.perform(post("/api/v1/orders/order-1/mark-shipped").header("Authorization", "Bearer good-token"))
                 .andExpect(status().isForbidden());
+    }
+
+    private InvoiceResult sampleInvoice() {
+        return new InvoiceResult("INV-2026-3F9A1C2B", "order-1", "buyer-1", List.of(), new BigDecimal("150.00"),
+                "PAID", Instant.now());
+    }
+
+    @Test
+    void getInvoice_returns200ForTheCallerAndDoesNotGrantStaffScopeToABuyer() throws Exception {
+        authenticateAsWithRole("buyer-1", "BUYER", "ORDER.VIEW");
+        when(getOrderInvoiceUseCase.getInvoice("order-1", "buyer-1", false)).thenReturn(sampleInvoice());
+
+        mockMvc.perform(get("/api/v1/orders/order-1/invoice").header("Authorization", "Bearer good-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.invoiceNumber").value("INV-2026-3F9A1C2B"))
+                .andExpect(jsonPath("$.data.orderStatus").value("PAID"));
+    }
+
+    @Test
+    void getInvoice_givesStaffScopeToAdminAndSupportStaff() throws Exception {
+        authenticateAsWithRole("support-1", "SUPPORT_STAFF", "ORDER.VIEW");
+        when(getOrderInvoiceUseCase.getInvoice("order-1", "support-1", true)).thenReturn(sampleInvoice());
+
+        mockMvc.perform(get("/api/v1/orders/order-1/invoice").header("Authorization", "Bearer good-token"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void getInvoice_returns409WhenTheOrderIsNotPaid() throws Exception {
+        authenticateAsWithRole("buyer-1", "BUYER", "ORDER.VIEW");
+        when(getOrderInvoiceUseCase.getInvoice("order-1", "buyer-1", false))
+                .thenThrow(new ConflictException("INVOICE_NOT_AVAILABLE", "Order order-1 has not been paid"));
+
+        mockMvc.perform(get("/api/v1/orders/order-1/invoice").header("Authorization", "Bearer good-token"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("INVOICE_NOT_AVAILABLE"));
+    }
+
+    @Test
+    void getInvoice_returns401WithoutAToken() throws Exception {
+        mockMvc.perform(get("/api/v1/orders/order-1/invoice"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

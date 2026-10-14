@@ -1,6 +1,7 @@
 package com.nexus.commerce.api;
 
 import com.nexus.commerce.api.dto.request.RefundOrderRequest;
+import com.nexus.commerce.api.dto.response.InvoiceResponse;
 import com.nexus.commerce.api.dto.response.OrderResponse;
 import com.nexus.commerce.api.mapper.CommerceApiMapper;
 import com.nexus.commerce.application.usecase.*;
@@ -27,6 +28,7 @@ public class OrderController {
 
     private final StartCheckoutUseCase startCheckoutUseCase;
     private final GetOrderUseCase getOrderUseCase;
+    private final GetOrderInvoiceUseCase getOrderInvoiceUseCase;
     private final ListOrdersUseCase listOrdersUseCase;
     private final ListAllOrdersUseCase listAllOrdersUseCase;
     private final ListOrdersSellingUseCase listOrdersSellingUseCase;
@@ -36,6 +38,7 @@ public class OrderController {
     private final CommerceApiMapper mapper;
 
     public OrderController(StartCheckoutUseCase startCheckoutUseCase, GetOrderUseCase getOrderUseCase,
+                            GetOrderInvoiceUseCase getOrderInvoiceUseCase,
                             ListOrdersUseCase listOrdersUseCase, ListAllOrdersUseCase listAllOrdersUseCase,
                             ListOrdersSellingUseCase listOrdersSellingUseCase,
                             MarkOrderShippedUseCase markOrderShippedUseCase,
@@ -43,6 +46,7 @@ public class OrderController {
                             CommerceApiMapper mapper) {
         this.startCheckoutUseCase = startCheckoutUseCase;
         this.getOrderUseCase = getOrderUseCase;
+        this.getOrderInvoiceUseCase = getOrderInvoiceUseCase;
         this.listOrdersUseCase = listOrdersUseCase;
         this.listAllOrdersUseCase = listAllOrdersUseCase;
         this.listOrdersSellingUseCase = listOrdersSellingUseCase;
@@ -98,6 +102,16 @@ public class OrderController {
     @GetMapping("/orders/{orderId}")
     public ResponseEntity<ApiResponse<OrderResponse>> getOrder(@PathVariable String orderId) {
         OrderResult result = getOrderUseCase.getOrder(orderId);
+        return ResponseEntity.ok(ApiResponse.ok(mapper.toResponse(result)));
+    }
+
+    @RequiresPrivilege("ORDER.VIEW")
+    @GetMapping("/orders/{orderId}/invoice")
+    public ResponseEntity<ApiResponse<InvoiceResponse>> getInvoice(Authentication authentication,
+                                                                      @PathVariable String orderId) {
+        String role = authentication.getDetails() instanceof TokenDetails details ? details.role() : null;
+        InvoiceResult result = getOrderInvoiceUseCase.getInvoice(orderId, buyerId(authentication),
+                CAN_LIST_ALL_ORDERS.contains(role));
         return ResponseEntity.ok(ApiResponse.ok(mapper.toResponse(result)));
     }
 

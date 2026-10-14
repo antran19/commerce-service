@@ -72,6 +72,11 @@ public class UseCaseConfig {
     }
 
     @Bean
+    public GetOrderInvoiceUseCase getOrderInvoiceUseCase(OrderRepositoryPort orderRepositoryPort) {
+        return new GetOrderInvoiceUseCase(orderRepositoryPort);
+    }
+
+    @Bean
     public ListOrdersUseCase listOrdersUseCase(OrderRepositoryPort orderRepositoryPort) {
         return new ListOrdersUseCase(orderRepositoryPort);
     }
