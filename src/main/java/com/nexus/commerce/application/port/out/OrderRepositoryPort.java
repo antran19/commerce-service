@@ -2,6 +2,7 @@ package com.nexus.commerce.application.port.out;
 
 import com.nexus.commerce.domain.model.Order;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -12,5 +13,7 @@ public interface OrderRepositoryPort {
     List<Order> findByBuyerId(String buyerId);
     List<Order> findBySellerId(String sellerId);
     List<Order> findAll();
+    // AWAITING_PAYMENT orders from direct checkout (no auctionId) created before the cutoff.
+    List<Order> findUnpaidDirectOrdersCreatedBefore(Instant cutoff);
     Order save(Order order);
 }

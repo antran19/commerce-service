@@ -9,6 +9,8 @@ import com.stripe.param.checkout.SessionCreateParams;
 import org.springframework.stereotype.Component;
 
 import java.math.RoundingMode;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 
 @Component
@@ -18,6 +20,17 @@ public class StripePaymentGatewayAdapter implements PaymentGatewayPort {
     // VND amount itself, NOT the amount * 100. Multiplying here would overcharge 100x.
     private static final String CURRENCY = "vnd";
 
+    // Stripe's default session lifetime is 24h, far longer than ExpireUnpaidOrdersUseCase's
+    // window: a buyer could pay on a Stripe page for an order we already cancelled. Stripe
+    // requires expires_at to be at least 30 minutes ahead (and at most 24h), so use the
+    // minimum plus a 30s margin for clock skew/latency -- the closest we can get to the order's
+    // own unpaid timeout.
+    static final Duration SESSION_LIFETIME = Duration.ofMinutes(30).plusSeconds(30);
+
+    static long expiresAt(Instant now) {
+        return now.plus(SESSION_LIFETIME).getEpochSecond();
+    }
+
     @Override
     public CheckoutSession createCheckoutSession(String orderId, String buyerId, List<LineItem> lineItems,
                                                   String successUrl, String cancelUrl) {
@@ -25,6 +38,7 @@ public class StripePaymentGatewayAdapter implements PaymentGatewayPort {
                 .setMode(SessionCreateParams.Mode.PAYMENT)
                 .setSuccessUrl(successUrl + (successUrl.contains("?") ? "&" : "?") + "session_id={CHECKOUT_SESSION_ID}")
                 .setCancelUrl(cancelUrl)
+                .setExpiresAt(expiresAt(Instant.now()))
                 .putMetadata("orderId", orderId)
                 .putMetadata("buyerId", buyerId);
 

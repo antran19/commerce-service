@@ -127,6 +127,14 @@ public class UseCaseConfig {
     }
 
     @Bean
+    public ExpireUnpaidOrdersUseCase expireUnpaidOrdersUseCase(
+            OrderRepositoryPort orderRepositoryPort, EventPublisherPort eventPublisherPort,
+            @Value("${nexus.order.unpaid-timeout-minutes:30}") long timeoutMinutes) {
+        return new ExpireUnpaidOrdersUseCase(orderRepositoryPort, eventPublisherPort,
+                java.time.Duration.ofMinutes(timeoutMinutes));
+    }
+
+    @Bean
     public ExpireInactiveCartsUseCase expireInactiveCartsUseCase(
             CartRepositoryPort cartRepositoryPort,
             @Value("${nexus.cart.max-inactive-days:30}") long maxInactiveDays) {

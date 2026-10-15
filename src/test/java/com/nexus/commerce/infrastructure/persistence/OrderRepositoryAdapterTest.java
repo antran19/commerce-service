@@ -48,6 +48,30 @@ class OrderRepositoryAdapterTest {
                 List.of(new OrderItem("product-1", "seller-1", "Laptop X", new BigDecimal("999.00"), 1)));
     }
 
+    private Order orderCreatedAt(Instant createdAt, String auctionId, OrderStatus status) {
+        return Order.reconstitute(java.util.UUID.randomUUID().toString(), "buyer-1", auctionId,
+                List.of(new OrderItem("product-1", "seller-1", "Laptop X", new BigDecimal("999.00"), 1)),
+                new BigDecimal("999.00"), status, createdAt, null, null, null);
+    }
+
+    @Test
+    void findUnpaidDirectOrdersCreatedBefore_returnsOnlyOldUnpaidDirectOrders() {
+        Instant now = Instant.now();
+        Order oldUnpaid = orderCreatedAt(now.minusSeconds(3600), null, OrderStatus.AWAITING_PAYMENT);
+        Order recentUnpaid = orderCreatedAt(now.minusSeconds(60), null, OrderStatus.AWAITING_PAYMENT);
+        Order oldAuctionOrder = orderCreatedAt(now.minusSeconds(3600), "auction-9", OrderStatus.AWAITING_PAYMENT);
+        Order oldCancelled = orderCreatedAt(now.minusSeconds(3600), null, OrderStatus.CANCELLED);
+        for (Order o : List.of(oldUnpaid, recentUnpaid, oldAuctionOrder, oldCancelled)) {
+            adapter.save(o);
+        }
+        entityManager.flush();
+        entityManager.clear();
+
+        List<Order> due = adapter.findUnpaidDirectOrdersCreatedBefore(now.minusSeconds(1800));
+
+        assertThat(due).extracting(Order::getId).containsExactly(oldUnpaid.getId());
+    }
+
     @Test
     void save_thenFindById_roundTripsAllFields() {
         Order order = newOrder("buyer-1", null);

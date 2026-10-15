@@ -8,6 +8,7 @@ import com.nexus.commerce.infrastructure.persistence.entity.OrderItemEmbeddable;
 import com.nexus.commerce.infrastructure.persistence.entity.OrderJpaEntity;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -49,6 +50,11 @@ public class OrderRepositoryAdapter implements OrderRepositoryPort {
     @Override
     public List<Order> findAll() {
         return jpaRepository.findAllByOrderByCreatedAtDesc().stream().map(this::toDomain).toList();
+    }
+
+    @Override
+    public List<Order> findUnpaidDirectOrdersCreatedBefore(Instant cutoff) {
+        return jpaRepository.findUnpaidDirectOrdersCreatedBefore(cutoff).stream().map(this::toDomain).toList();
     }
 
     @Override

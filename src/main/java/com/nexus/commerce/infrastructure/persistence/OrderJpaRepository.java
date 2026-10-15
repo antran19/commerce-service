@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -26,4 +27,8 @@ public interface OrderJpaRepository extends JpaRepository<OrderJpaEntity, UUID> 
     List<OrderJpaEntity> findBySellerId(@Param("sellerId") String sellerId);
 
     List<OrderJpaEntity> findAllByOrderByCreatedAtDesc();
+
+    @Query("SELECT o FROM OrderJpaEntity o WHERE o.status = 'AWAITING_PAYMENT' AND o.auctionId IS NULL "
+            + "AND o.createdAt < :cutoff")
+    List<OrderJpaEntity> findUnpaidDirectOrdersCreatedBefore(@Param("cutoff") Instant cutoff);
 }

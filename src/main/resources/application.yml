@@ -43,6 +43,9 @@ nexus:
       secret-key: ${STRIPE_SECRET_KEY:}
   cart:
     max-inactive-days: 30
+  order:
+    unpaid-timeout-minutes: 30
+    unpaid-expiry-check-interval-ms: 60000
 
 management:
   endpoints:
