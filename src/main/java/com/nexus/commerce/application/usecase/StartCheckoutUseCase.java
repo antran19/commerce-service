@@ -43,9 +43,10 @@ public class StartCheckoutUseCase {
         return OrderResult.from(saved);
     }
 
-    // productId doubles as fulfillment-service's skuId: every product currently has exactly
-    // one SKU (see catalog-service's Sku model), so there is no real distinction yet. If that
-    // 1:1 assumption ever changes, this needs the order item's actual SKU id instead.
+    // Stock is keyed by the PRODUCT id: this productId is sent in the "skuId" field of the event
+    // and fulfillment-service stores it as sku_id, but it is NOT catalog's own Sku id (that is a
+    // different, random value). Every product currently has exactly one SKU, so the two never
+    // need to be told apart; if a product ever gets several SKUs, this needs the real SKU id.
     private static List<ReservationLineItem> toLineItems(List<OrderItem> items) {
         return items.stream().map(i -> new ReservationLineItem(i.getProductId(), i.getQuantity())).toList();
     }
