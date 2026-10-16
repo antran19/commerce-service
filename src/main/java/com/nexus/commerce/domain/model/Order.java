@@ -83,6 +83,19 @@ public class Order {
                 paymentReference, shippedAt, shippingAddress);
     }
 
+    // The buyer paid on a still-open Stripe page after this order was already cancelled (closed
+    // tab + unpaid-timeout, or cancelled then paid anyway). The money is sent straight back, so
+    // the order goes CANCELLED -> REFUNDED; paidAt/paymentReference record the charge that was
+    // refunded (the invoice of a REFUNDED order needs paidAt). Stock is untouched: the
+    // reservation was already released when the order was cancelled.
+    public Order refundLatePayment(Instant when, String paymentReference) {
+        if (status != OrderStatus.CANCELLED) {
+            throw new IllegalStateException("Only a cancelled order can have a late payment refunded");
+        }
+        return new Order(id, buyerId, auctionId, items, totalAmount, OrderStatus.REFUNDED, createdAt, when,
+                paymentReference, shippedAt, shippingAddress);
+    }
+
     public Order markShipped(Instant when) {
         return new Order(id, buyerId, auctionId, items, totalAmount, status, createdAt, paidAt, paymentReference,
                 when, shippingAddress);

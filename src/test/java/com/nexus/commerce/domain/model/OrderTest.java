@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class OrderTest {
 
@@ -97,5 +98,24 @@ class OrderTest {
                 item("product-2", "seller-2", new BigDecimal("50.00"), 1)));
 
         assertThat(order.singleSellerIdOrNull()).isNull();
+    }
+
+    @Test
+    void refundLatePayment_movesCancelledOrderToRefundedWithChargeRecorded() {
+        Instant when = Instant.parse("2026-10-16T10:00:00Z");
+        Order order = Order.create("buyer-1", null, List.of(item("product-1", "seller-1", new BigDecimal("100.00"), 1)))
+                .cancel().refundLatePayment(when, "pi_late");
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.REFUNDED);
+        assertThat(order.getPaymentReference()).isEqualTo("pi_late");
+        assertThat(order.getPaidAt()).isEqualTo(when);
+    }
+
+    @Test
+    void refundLatePayment_rejectsOrderThatIsNotCancelled() {
+        Order order = Order.create("buyer-1", null, List.of(item("product-1", "seller-1", new BigDecimal("100.00"), 1)));
+
+        assertThatThrownBy(() -> order.refundLatePayment(Instant.now(), "pi_late"))
+                .isInstanceOf(IllegalStateException.class);
     }
 }

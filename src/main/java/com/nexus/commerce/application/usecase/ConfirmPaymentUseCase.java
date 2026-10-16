@@ -1,29 +1,27 @@
 package com.nexus.commerce.application.usecase;
 
 import com.nexus.commerce.application.exception.OrderNotFoundException;
-import com.nexus.commerce.application.port.out.EventPublisherPort;
 import com.nexus.commerce.application.port.out.OrderRepositoryPort;
 import com.nexus.commerce.application.port.out.PaymentGatewayPort;
 import com.nexus.commerce.domain.model.Order;
 import com.nexus.commerce.domain.model.OrderStatus;
 import com.nexus.common.core.exception.ConflictException;
 import com.nexus.common.core.exception.ForbiddenException;
-import com.nexus.common.events.OrderPaidEvent;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
-
+// The buyer's browser path back from Stripe. Stripe's webhook (HandlePaymentWebhookUseCase)
+// settles the same order even if the buyer never comes back; both go through PaidOrderSettler.
 public class ConfirmPaymentUseCase {
 
     private final OrderRepositoryPort orderRepositoryPort;
     private final PaymentGatewayPort paymentGatewayPort;
-    private final EventPublisherPort eventPublisherPort;
+    private final PaidOrderSettler paidOrderSettler;
 
     public ConfirmPaymentUseCase(OrderRepositoryPort orderRepositoryPort, PaymentGatewayPort paymentGatewayPort,
-                                  EventPublisherPort eventPublisherPort) {
+                                  PaidOrderSettler paidOrderSettler) {
         this.orderRepositoryPort = orderRepositoryPort;
         this.paymentGatewayPort = paymentGatewayPort;
-        this.eventPublisherPort = eventPublisherPort;
+        this.paidOrderSettler = paidOrderSettler;
     }
 
     @Transactional
@@ -35,9 +33,9 @@ public class ConfirmPaymentUseCase {
             throw new ForbiddenException("NOT_THE_BUYER", "Only the order's buyer can confirm this payment");
         }
 
-        // Idempotent: a page refresh or duplicate confirm call after the first success must
-        // not re-hit Stripe or fail -- it just reports the already-settled state back.
-        if (order.getStatus() == OrderStatus.PAID) {
+        // Idempotent: a page refresh, a duplicate confirm call, or the webhook having already
+        // settled the order must not re-hit Stripe or fail -- just report the settled state.
+        if (order.getStatus() == OrderStatus.PAID || order.getStatus() == OrderStatus.REFUNDED) {
             return OrderResult.from(order);
         }
 
@@ -53,9 +51,7 @@ public class ConfirmPaymentUseCase {
                     "This payment session does not belong to this order/buyer");
         }
 
-        Order saved = orderRepositoryPort.save(order.markPaid(Instant.now(), paymentStatus.paymentReference()));
-        eventPublisherPort.publish(new OrderPaidEvent(saved.getId(), saved.getAuctionId(), saved.getBuyerId(),
-                saved.singleSellerIdOrNull(), saved.getTotalAmount(), saved.getPaidAt()));
-        return OrderResult.from(saved);
+        // AWAITING_PAYMENT -> PAID; CANCELLED -> refunded straight away (paid too late).
+        return OrderResult.from(paidOrderSettler.settle(order, paymentStatus.paymentReference()));
     }
 }

@@ -53,10 +53,24 @@ public class UseCaseConfig {
     }
 
     @Bean
+    public PaidOrderSettler paidOrderSettler(OrderRepositoryPort orderRepositoryPort,
+                                             PaymentGatewayPort paymentGatewayPort,
+                                             EventPublisherPort eventPublisherPort) {
+        return new PaidOrderSettler(orderRepositoryPort, paymentGatewayPort, eventPublisherPort);
+    }
+
+    @Bean
     public ConfirmPaymentUseCase confirmPaymentUseCase(OrderRepositoryPort orderRepositoryPort,
                                                          PaymentGatewayPort paymentGatewayPort,
-                                                         EventPublisherPort eventPublisherPort) {
-        return new ConfirmPaymentUseCase(orderRepositoryPort, paymentGatewayPort, eventPublisherPort);
+                                                         PaidOrderSettler paidOrderSettler) {
+        return new ConfirmPaymentUseCase(orderRepositoryPort, paymentGatewayPort, paidOrderSettler);
+    }
+
+    @Bean
+    public HandlePaymentWebhookUseCase handlePaymentWebhookUseCase(OrderRepositoryPort orderRepositoryPort,
+                                                                   PaymentGatewayPort paymentGatewayPort,
+                                                                   PaidOrderSettler paidOrderSettler) {
+        return new HandlePaymentWebhookUseCase(orderRepositoryPort, paymentGatewayPort, paidOrderSettler);
     }
 
     @Bean

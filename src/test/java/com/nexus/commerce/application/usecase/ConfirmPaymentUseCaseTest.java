@@ -38,7 +38,8 @@ class ConfirmPaymentUseCaseTest {
         orderRepositoryPort = mock(OrderRepositoryPort.class);
         paymentGatewayPort = mock(PaymentGatewayPort.class);
         eventPublisherPort = mock(EventPublisherPort.class);
-        useCase = new ConfirmPaymentUseCase(orderRepositoryPort, paymentGatewayPort, eventPublisherPort);
+        useCase = new ConfirmPaymentUseCase(orderRepositoryPort, paymentGatewayPort,
+                new PaidOrderSettler(orderRepositoryPort, paymentGatewayPort, eventPublisherPort));
         when(orderRepositoryPort.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
     }
 
@@ -97,5 +98,30 @@ class ConfirmPaymentUseCaseTest {
 
         assertThatThrownBy(() -> useCase.confirm(order.getId(), "someone-else", "sess-1"))
                 .isInstanceOf(ForbiddenException.class);
+    }
+
+    @Test
+    void confirm_refundsWhenOrderWasAlreadyCancelled() {
+        Order order = awaitingPaymentOrder().cancel();
+        when(orderRepositoryPort.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+        when(paymentGatewayPort.retrieveSessionStatus("sess-1"))
+                .thenReturn(new PaymentGatewayPort.PaymentStatus(true, order.getId(), "buyer-1", "pi_test"));
+
+        OrderResult result = useCase.confirm(order.getId(), "buyer-1", "sess-1");
+
+        assertThat(result.status()).isEqualTo("REFUNDED");
+        verify(paymentGatewayPort).refund("pi_test");
+    }
+
+    @Test
+    void confirm_isNoOpWhenAlreadyRefunded() {
+        Order order = awaitingPaymentOrder().cancel().refundLatePayment(Instant.now(), "pi_test");
+        when(orderRepositoryPort.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+
+        OrderResult result = useCase.confirm(order.getId(), "buyer-1", "sess-1");
+
+        assertThat(result.status()).isEqualTo("REFUNDED");
+        verify(paymentGatewayPort, never()).retrieveSessionStatus(any());
+        verify(paymentGatewayPort, never()).refund(any());
     }
 }

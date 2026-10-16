@@ -41,6 +41,8 @@ nexus:
   payment:
     stripe:
       secret-key: ${STRIPE_SECRET_KEY:}
+      # whsec_... (Stripe dashboard, or printed by `stripe listen`). Blank = webhook rejects all calls.
+      webhook-secret: ${STRIPE_WEBHOOK_SECRET:}
   cart:
     max-inactive-days: 30
   order:
