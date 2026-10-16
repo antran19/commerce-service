@@ -1,10 +1,9 @@
 package com.nexus.commerce.infrastructure.messaging;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexus.commerce.application.usecase.CreateOrderFromAuctionUseCase;
 import com.nexus.common.events.AuctionWonEvent;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
@@ -15,7 +14,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class AuctionEventsListener {
 
-    private static final Logger log = LoggerFactory.getLogger(AuctionEventsListener.class);
 
     private final ObjectMapper objectMapper;
     private final CreateOrderFromAuctionUseCase createOrderFromAuctionUseCase;
@@ -26,18 +24,16 @@ public class AuctionEventsListener {
         this.createOrderFromAuctionUseCase = createOrderFromAuctionUseCase;
     }
 
+    // Exceptions are NOT caught here on purpose: KafkaErrorHandlingConfig retries them, then
+    // moves the record to the dead-letter topic instead of losing it.
     @KafkaListener(topics = "auction-events")
-    public void onMessage(String rawPayload) {
-        try {
-            String eventType = objectMapper.readTree(rawPayload).path("eventType").asText();
-            if (!"AuctionWon".equals(eventType)) {
-                return;
-            }
-            AuctionWonEvent event = objectMapper.readValue(rawPayload, AuctionWonEvent.class);
-            createOrderFromAuctionUseCase.createFromAuction(event.getAuctionId(), event.getProductId(),
-                    event.getSellerId(), event.getWinnerId(), event.getFinalPrice());
-        } catch (Exception e) {
-            log.error("Failed to process auction-events message: {}", rawPayload, e);
+    public void onMessage(String rawPayload) throws JsonProcessingException {
+        String eventType = objectMapper.readTree(rawPayload).path("eventType").asText();
+        if (!"AuctionWon".equals(eventType)) {
+            return;
         }
+        AuctionWonEvent event = objectMapper.readValue(rawPayload, AuctionWonEvent.class);
+        createOrderFromAuctionUseCase.createFromAuction(event.getAuctionId(), event.getProductId(),
+                event.getSellerId(), event.getWinnerId(), event.getFinalPrice());
     }
 }

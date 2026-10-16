@@ -1,10 +1,9 @@
 package com.nexus.commerce.infrastructure.messaging;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexus.commerce.application.usecase.CancelOrderDueToStockFailureUseCase;
 import com.nexus.common.events.InventoryReservationFailedEvent;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
@@ -15,7 +14,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class FulfillmentEventsListener {
 
-    private static final Logger log = LoggerFactory.getLogger(FulfillmentEventsListener.class);
 
     private final ObjectMapper objectMapper;
     private final CancelOrderDueToStockFailureUseCase cancelOrderDueToStockFailureUseCase;
@@ -26,18 +24,16 @@ public class FulfillmentEventsListener {
         this.cancelOrderDueToStockFailureUseCase = cancelOrderDueToStockFailureUseCase;
     }
 
+    // Exceptions are NOT caught here on purpose: KafkaErrorHandlingConfig retries them, then
+    // moves the record to the dead-letter topic instead of losing it.
     @KafkaListener(topics = "fulfillment-events")
-    public void onMessage(String rawPayload) {
-        try {
-            String eventType = objectMapper.readTree(rawPayload).path("eventType").asText();
-            if (!"InventoryReservationFailed".equals(eventType)) {
-                return;
-            }
-            InventoryReservationFailedEvent event =
-                    objectMapper.readValue(rawPayload, InventoryReservationFailedEvent.class);
-            cancelOrderDueToStockFailureUseCase.cancel(event.getOrderId(), event.getReason());
-        } catch (Exception e) {
-            log.error("Failed to process fulfillment-events message: {}", rawPayload, e);
+    public void onMessage(String rawPayload) throws JsonProcessingException {
+        String eventType = objectMapper.readTree(rawPayload).path("eventType").asText();
+        if (!"InventoryReservationFailed".equals(eventType)) {
+            return;
         }
+        InventoryReservationFailedEvent event =
+                objectMapper.readValue(rawPayload, InventoryReservationFailedEvent.class);
+        cancelOrderDueToStockFailureUseCase.cancel(event.getOrderId(), event.getReason());
     }
 }
