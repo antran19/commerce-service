@@ -27,9 +27,7 @@ public class GetOrderInvoiceUseCase {
         Order order = orderRepositoryPort.findById(orderId).orElseThrow(() -> new OrderNotFoundException(orderId));
 
         // Authorize before revealing anything about the order's state.
-        boolean isBuyer = order.getBuyerId().equals(callerId);
-        boolean isSellerOfAnItem = order.getItems().stream().anyMatch(item -> item.getSellerId().equals(callerId));
-        if (!canViewAny && !isBuyer && !isSellerOfAnItem) {
+        if (!OrderAccessPolicy.canView(order, callerId, canViewAny)) {
             throw new ForbiddenException("NOT_ALLOWED_TO_VIEW_INVOICE",
                     "Only the buyer, a seller in the order, or staff may view this invoice");
         }

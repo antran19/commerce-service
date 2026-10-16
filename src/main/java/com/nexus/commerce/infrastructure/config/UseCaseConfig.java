@@ -77,6 +77,11 @@ public class UseCaseConfig {
     }
 
     @Bean
+    public SetShippingAddressUseCase setShippingAddressUseCase(OrderRepositoryPort orderRepositoryPort) {
+        return new SetShippingAddressUseCase(orderRepositoryPort);
+    }
+
+    @Bean
     public ListOrdersUseCase listOrdersUseCase(OrderRepositoryPort orderRepositoryPort) {
         return new ListOrdersUseCase(orderRepositoryPort);
     }

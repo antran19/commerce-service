@@ -6,6 +6,7 @@ import com.nexus.commerce.application.port.out.PaymentGatewayPort;
 import com.nexus.commerce.domain.model.Order;
 import com.nexus.commerce.domain.model.OrderItem;
 import com.nexus.commerce.domain.model.OrderStatus;
+import com.nexus.commerce.domain.model.ShippingAddress;
 import com.nexus.common.core.exception.ConflictException;
 import com.nexus.common.core.exception.ForbiddenException;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,7 +35,8 @@ class CreateCheckoutSessionUseCaseTest {
                 List.of(new OrderItem("product-1", "seller-1", "Laptop X", new BigDecimal("100.00"), 1)));
         return Order.reconstitute(base.getId(), buyerId, null, base.getItems(), base.getTotalAmount(),
                 status, base.getCreatedAt(), status == OrderStatus.PAID ? Instant.now() : null,
-                status == OrderStatus.PAID ? "pi_test" : null, null);
+                status == OrderStatus.PAID ? "pi_test" : null, null,
+                ShippingAddress.create("Nguyen Van A", "0901234567", "12 Le Loi", "Ho Chi Minh"));
     }
 
     @BeforeEach
@@ -55,6 +57,18 @@ class CreateCheckoutSessionUseCaseTest {
                 "https://fe/success", "https://fe/cancel");
 
         assertThat(session.checkoutUrl()).isEqualTo("https://checkout.stripe.com/sess-1");
+    }
+
+    @Test
+    void createSession_requiresAShippingAddress() {
+        Order base = order("buyer-1", OrderStatus.AWAITING_PAYMENT);
+        Order noAddress = Order.reconstitute(base.getId(), "buyer-1", null, base.getItems(), base.getTotalAmount(),
+                OrderStatus.AWAITING_PAYMENT, base.getCreatedAt(), null, null, null);
+        when(orderRepositoryPort.findById(noAddress.getId())).thenReturn(Optional.of(noAddress));
+
+        assertThatThrownBy(() -> useCase.createSession(noAddress.getId(), "buyer-1", "s", "c"))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("shipping address");
     }
 
     @Test

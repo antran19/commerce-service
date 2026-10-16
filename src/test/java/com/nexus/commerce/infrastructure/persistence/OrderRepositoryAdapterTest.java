@@ -3,6 +3,7 @@ package com.nexus.commerce.infrastructure.persistence;
 import com.nexus.commerce.domain.model.Order;
 import com.nexus.commerce.domain.model.OrderItem;
 import com.nexus.commerce.domain.model.OrderStatus;
+import com.nexus.commerce.domain.model.ShippingAddress;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
@@ -70,6 +71,29 @@ class OrderRepositoryAdapterTest {
         List<Order> due = adapter.findUnpaidDirectOrdersCreatedBefore(now.minusSeconds(1800));
 
         assertThat(due).extracting(Order::getId).containsExactly(oldUnpaid.getId());
+    }
+
+    @Test
+    void save_thenFindById_roundTripsTheShippingAddress() {
+        Order order = newOrder("buyer-1", null)
+                .withShippingAddress(ShippingAddress.create("Nguyen Van A", "0901234567", "12 Le Loi", "HCM"));
+        adapter.save(order);
+        entityManager.flush();
+        entityManager.clear();
+
+        Order reloaded = adapter.findById(order.getId()).orElseThrow();
+
+        assertThat(reloaded.getShippingAddress()).isEqualTo(order.getShippingAddress());
+    }
+
+    @Test
+    void save_withoutAnAddress_reloadsWithANullAddress() {
+        Order order = newOrder("buyer-1", null);
+        adapter.save(order);
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(adapter.findById(order.getId()).orElseThrow().getShippingAddress()).isNull();
     }
 
     @Test

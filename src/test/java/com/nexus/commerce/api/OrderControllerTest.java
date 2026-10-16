@@ -27,6 +27,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -45,6 +46,7 @@ class OrderControllerTest {
     @MockBean private ListAllOrdersUseCase listAllOrdersUseCase;
     @MockBean private ListOrdersSellingUseCase listOrdersSellingUseCase;
     @MockBean private MarkOrderShippedUseCase markOrderShippedUseCase;
+    @MockBean private SetShippingAddressUseCase setShippingAddressUseCase;
     @MockBean private CancelOrderUseCase cancelOrderUseCase;
     @MockBean private RefundOrderUseCase refundOrderUseCase;
     @MockBean private JwtTokenProvider jwtTokenProvider;
@@ -98,11 +100,62 @@ class OrderControllerTest {
     @Test
     void getOrder_returns200() throws Exception {
         authenticateAs("buyer-1", "ORDER.VIEW");
-        when(getOrderUseCase.getOrder("order-1")).thenReturn(sampleOrder());
+        when(getOrderUseCase.getOrder("order-1", "buyer-1", false)).thenReturn(sampleOrder());
 
         mockMvc.perform(get("/api/v1/orders/order-1").header("Authorization", "Bearer good-token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("AWAITING_PAYMENT"));
+    }
+
+    @Test
+    void getOrder_givesStaffViewAnyScope() throws Exception {
+        authenticateAsWithRole("support-1", "SUPPORT_STAFF", "ORDER.VIEW");
+        when(getOrderUseCase.getOrder("order-1", "support-1", true)).thenReturn(sampleOrder());
+
+        mockMvc.perform(get("/api/v1/orders/order-1").header("Authorization", "Bearer good-token"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void getOrder_returns403ForSomeoneNotInTheOrder() throws Exception {
+        authenticateAs("stranger", "ORDER.VIEW");
+        when(getOrderUseCase.getOrder("order-1", "stranger", false))
+                .thenThrow(new com.nexus.common.core.exception.ForbiddenException("NOT_ALLOWED_TO_VIEW_ORDER", "no"));
+
+        mockMvc.perform(get("/api/v1/orders/order-1").header("Authorization", "Bearer good-token"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void setShippingAddress_returns200AndTheAddress() throws Exception {
+        authenticateAs("buyer-1", "CHECKOUT.START");
+        when(setShippingAddressUseCase.setShippingAddress("order-1", "buyer-1", "Nguyen Van A", "0901234567",
+                "12 Le Loi", "Ho Chi Minh")).thenReturn(
+                new OrderResult("order-1", "buyer-1", null, List.of(), new BigDecimal("150.00"),
+                        "AWAITING_PAYMENT", Instant.now(), null, null,
+                        new ShippingAddressResult("Nguyen Van A", "0901234567", "12 Le Loi", "Ho Chi Minh")));
+
+        mockMvc.perform(put("/api/v1/orders/order-1/shipping-address")
+                        .header("Authorization", "Bearer good-token")
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"recipientName":"Nguyen Van A","phone":"0901234567",
+                                 "addressLine":"12 Le Loi","city":"Ho Chi Minh"}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.shippingAddress.city").value("Ho Chi Minh"))
+                .andExpect(jsonPath("$.data.shippingAddress.recipientName").value("Nguyen Van A"));
+    }
+
+    @Test
+    void setShippingAddress_returns400WhenAFieldIsMissing() throws Exception {
+        authenticateAs("buyer-1", "CHECKOUT.START");
+
+        mockMvc.perform(put("/api/v1/orders/order-1/shipping-address")
+                        .header("Authorization", "Bearer good-token")
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"recipientName":"Nguyen Van A","phone":"0901234567","addressLine":"","city":"HCM"}"""))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

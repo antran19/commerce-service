@@ -46,12 +46,25 @@ public class OrderJpaEntity {
     @Column(name = "shipped_at")
     private Instant shippedAt;
 
+    @Column(name = "ship_recipient_name")
+    private String shipRecipientName;
+
+    @Column(name = "ship_phone")
+    private String shipPhone;
+
+    @Column(name = "ship_address_line")
+    private String shipAddressLine;
+
+    @Column(name = "ship_city")
+    private String shipCity;
+
     protected OrderJpaEntity() {
     }
 
     public OrderJpaEntity(UUID id, String buyerId, String auctionId, List<OrderItemEmbeddable> items,
                            BigDecimal totalAmount, String status, Instant createdAt, Instant paidAt,
-                           String paymentReference, Instant shippedAt) {
+                           String paymentReference, Instant shippedAt, String shipRecipientName,
+                           String shipPhone, String shipAddressLine, String shipCity) {
         this.id = id;
         this.buyerId = buyerId;
         this.auctionId = auctionId;
@@ -62,6 +75,10 @@ public class OrderJpaEntity {
         this.paidAt = paidAt;
         this.paymentReference = paymentReference;
         this.shippedAt = shippedAt;
+        this.shipRecipientName = shipRecipientName;
+        this.shipPhone = shipPhone;
+        this.shipAddressLine = shipAddressLine;
+        this.shipCity = shipCity;
     }
 
     public UUID getId() { return id; }
@@ -74,4 +91,8 @@ public class OrderJpaEntity {
     public Instant getPaidAt() { return paidAt; }
     public String getPaymentReference() { return paymentReference; }
     public Instant getShippedAt() { return shippedAt; }
+    public String getShipRecipientName() { return shipRecipientName; }
+    public String getShipPhone() { return shipPhone; }
+    public String getShipAddressLine() { return shipAddressLine; }
+    public String getShipCity() { return shipCity; }
 }

@@ -7,6 +7,7 @@ import com.nexus.commerce.api.dto.response.InvoiceResponse;
 import com.nexus.commerce.api.dto.response.OrderItemResponse;
 import com.nexus.commerce.api.dto.response.OrderResponse;
 import com.nexus.commerce.api.dto.response.ReturnRequestResponse;
+import com.nexus.commerce.api.dto.response.ShippingAddressResponse;
 import com.nexus.commerce.application.port.out.PaymentGatewayPort;
 import com.nexus.commerce.application.usecase.CartItemResult;
 import com.nexus.commerce.application.usecase.CartResult;
@@ -14,6 +15,7 @@ import com.nexus.commerce.application.usecase.InvoiceResult;
 import com.nexus.commerce.application.usecase.OrderItemResult;
 import com.nexus.commerce.application.usecase.OrderResult;
 import com.nexus.commerce.application.usecase.ReturnRequestResult;
+import com.nexus.commerce.application.usecase.ShippingAddressResult;
 import org.mapstruct.Mapper;
 
 @Mapper(componentModel = "spring")
@@ -23,6 +25,7 @@ public interface CommerceApiMapper {
     OrderItemResponse toResponse(OrderItemResult result);
     OrderResponse toResponse(OrderResult result);
     InvoiceResponse toResponse(InvoiceResult result);
+    ShippingAddressResponse toResponse(ShippingAddressResult result);
     CheckoutSessionResponse toResponse(PaymentGatewayPort.CheckoutSession result);
     ReturnRequestResponse toResponse(ReturnRequestResult result);
 }

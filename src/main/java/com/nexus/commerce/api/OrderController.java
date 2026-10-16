@@ -1,6 +1,7 @@
 package com.nexus.commerce.api;
 
 import com.nexus.commerce.api.dto.request.RefundOrderRequest;
+import com.nexus.commerce.api.dto.request.SetShippingAddressRequest;
 import com.nexus.commerce.api.dto.response.InvoiceResponse;
 import com.nexus.commerce.api.dto.response.OrderResponse;
 import com.nexus.commerce.api.mapper.CommerceApiMapper;
@@ -33,6 +34,7 @@ public class OrderController {
     private final ListAllOrdersUseCase listAllOrdersUseCase;
     private final ListOrdersSellingUseCase listOrdersSellingUseCase;
     private final MarkOrderShippedUseCase markOrderShippedUseCase;
+    private final SetShippingAddressUseCase setShippingAddressUseCase;
     private final CancelOrderUseCase cancelOrderUseCase;
     private final RefundOrderUseCase refundOrderUseCase;
     private final CommerceApiMapper mapper;
@@ -42,6 +44,7 @@ public class OrderController {
                             ListOrdersUseCase listOrdersUseCase, ListAllOrdersUseCase listAllOrdersUseCase,
                             ListOrdersSellingUseCase listOrdersSellingUseCase,
                             MarkOrderShippedUseCase markOrderShippedUseCase,
+                            SetShippingAddressUseCase setShippingAddressUseCase,
                             CancelOrderUseCase cancelOrderUseCase, RefundOrderUseCase refundOrderUseCase,
                             CommerceApiMapper mapper) {
         this.startCheckoutUseCase = startCheckoutUseCase;
@@ -51,6 +54,7 @@ public class OrderController {
         this.listAllOrdersUseCase = listAllOrdersUseCase;
         this.listOrdersSellingUseCase = listOrdersSellingUseCase;
         this.markOrderShippedUseCase = markOrderShippedUseCase;
+        this.setShippingAddressUseCase = setShippingAddressUseCase;
         this.cancelOrderUseCase = cancelOrderUseCase;
         this.refundOrderUseCase = refundOrderUseCase;
         this.mapper = mapper;
@@ -74,8 +78,7 @@ public class OrderController {
     @RequiresPrivilege("ORDER.LIST")
     @GetMapping("/orders")
     public ResponseEntity<ApiResponse<List<OrderResponse>>> listAllOrders(Authentication authentication) {
-        String role = authentication.getDetails() instanceof TokenDetails details ? details.role() : null;
-        if (!CAN_LIST_ALL_ORDERS.contains(role)) {
+        if (!canViewAnyOrder(authentication)) {
             throw new ForbiddenException("ORDER_LIST_ALL_FORBIDDEN", "Only Admin or Support Staff may list all orders");
         }
         List<OrderResponse> results = listAllOrdersUseCase.list().stream().map(mapper::toResponse).toList();
@@ -100,8 +103,10 @@ public class OrderController {
 
     @RequiresPrivilege("ORDER.VIEW")
     @GetMapping("/orders/{orderId}")
-    public ResponseEntity<ApiResponse<OrderResponse>> getOrder(@PathVariable String orderId) {
-        OrderResult result = getOrderUseCase.getOrder(orderId);
+    public ResponseEntity<ApiResponse<OrderResponse>> getOrder(Authentication authentication,
+                                                                  @PathVariable String orderId) {
+        OrderResult result = getOrderUseCase.getOrder(orderId, buyerId(authentication),
+                canViewAnyOrder(authentication));
         return ResponseEntity.ok(ApiResponse.ok(mapper.toResponse(result)));
     }
 
@@ -109,9 +114,19 @@ public class OrderController {
     @GetMapping("/orders/{orderId}/invoice")
     public ResponseEntity<ApiResponse<InvoiceResponse>> getInvoice(Authentication authentication,
                                                                       @PathVariable String orderId) {
-        String role = authentication.getDetails() instanceof TokenDetails details ? details.role() : null;
         InvoiceResult result = getOrderInvoiceUseCase.getInvoice(orderId, buyerId(authentication),
-                CAN_LIST_ALL_ORDERS.contains(role));
+                canViewAnyOrder(authentication));
+        return ResponseEntity.ok(ApiResponse.ok(mapper.toResponse(result)));
+    }
+
+    // Same actor as paying: the buyer sets where to ship before creating the payment session.
+    @RequiresPrivilege("CHECKOUT.START")
+    @PutMapping("/orders/{orderId}/shipping-address")
+    public ResponseEntity<ApiResponse<OrderResponse>> setShippingAddress(
+            Authentication authentication, @PathVariable String orderId,
+            @Valid @RequestBody SetShippingAddressRequest request) {
+        OrderResult result = setShippingAddressUseCase.setShippingAddress(orderId, buyerId(authentication),
+                request.recipientName(), request.phone(), request.addressLine(), request.city());
         return ResponseEntity.ok(ApiResponse.ok(mapper.toResponse(result)));
     }
 
@@ -129,6 +144,13 @@ public class OrderController {
                                                                       @Valid @RequestBody RefundOrderRequest request) {
         OrderResult result = refundOrderUseCase.refund(orderId, request.reason());
         return ResponseEntity.ok(ApiResponse.ok(mapper.toResponse(result)));
+    }
+
+    // Null-safe on purpose: Set.of(...).contains(null) throws NullPointerException, and a token
+    // without a role claim must mean "not staff", not a 500.
+    private static boolean canViewAnyOrder(Authentication authentication) {
+        String role = authentication.getDetails() instanceof TokenDetails details ? details.role() : null;
+        return role != null && CAN_LIST_ALL_ORDERS.contains(role);
     }
 
     private static String buyerId(Authentication authentication) {

@@ -23,10 +23,13 @@ public class Order {
     // to auto-release the reservation (not shipped yet) or whether goods handling needs the
     // manual Return flow instead (see ReturnRequest).
     private final Instant shippedAt;
+    // Null until the buyer sets it (PUT /orders/{id}/shipping-address); required before a
+    // payment session can be created. Orders created before V7 keep it null.
+    private final ShippingAddress shippingAddress;
 
     private Order(String id, String buyerId, String auctionId, List<OrderItem> items, BigDecimal totalAmount,
                    OrderStatus status, Instant createdAt, Instant paidAt, String paymentReference,
-                   Instant shippedAt) {
+                   Instant shippedAt, ShippingAddress shippingAddress) {
         this.id = id;
         this.buyerId = buyerId;
         this.auctionId = auctionId;
@@ -37,6 +40,7 @@ public class Order {
         this.paidAt = paidAt;
         this.paymentReference = paymentReference;
         this.shippedAt = shippedAt;
+        this.shippingAddress = shippingAddress;
     }
 
     // auctionId is null for a direct-purchase (cart/checkout) order; set when the order was
@@ -44,24 +48,31 @@ public class Order {
     public static Order create(String buyerId, String auctionId, List<OrderItem> items) {
         BigDecimal total = items.stream().map(OrderItem::subtotal).reduce(BigDecimal.ZERO, BigDecimal::add);
         return new Order(UUID.randomUUID().toString(), buyerId, auctionId, List.copyOf(items), total,
-                OrderStatus.AWAITING_PAYMENT, Instant.now(), null, null, null);
+                OrderStatus.AWAITING_PAYMENT, Instant.now(), null, null, null, null);
     }
 
     public static Order reconstitute(String id, String buyerId, String auctionId, List<OrderItem> items,
                                       BigDecimal totalAmount, OrderStatus status, Instant createdAt, Instant paidAt,
                                       String paymentReference, Instant shippedAt) {
+        return reconstitute(id, buyerId, auctionId, items, totalAmount, status, createdAt, paidAt,
+                paymentReference, shippedAt, null);
+    }
+
+    public static Order reconstitute(String id, String buyerId, String auctionId, List<OrderItem> items,
+                                      BigDecimal totalAmount, OrderStatus status, Instant createdAt, Instant paidAt,
+                                      String paymentReference, Instant shippedAt, ShippingAddress shippingAddress) {
         return new Order(id, buyerId, auctionId, List.copyOf(items), totalAmount, status, createdAt, paidAt,
-                paymentReference, shippedAt);
+                paymentReference, shippedAt, shippingAddress);
     }
 
     public Order markPaid(Instant when, String paymentReference) {
         return new Order(id, buyerId, auctionId, items, totalAmount, OrderStatus.PAID, createdAt, when,
-                paymentReference, shippedAt);
+                paymentReference, shippedAt, shippingAddress);
     }
 
     public Order cancel() {
         return new Order(id, buyerId, auctionId, items, totalAmount, OrderStatus.CANCELLED, createdAt, paidAt,
-                paymentReference, shippedAt);
+                paymentReference, shippedAt, shippingAddress);
     }
 
     // Money only -- whether the physical goods come back to stock is decided separately: see
@@ -69,12 +80,17 @@ public class Order {
     // restock once a shipped item is confirmed received back).
     public Order refund() {
         return new Order(id, buyerId, auctionId, items, totalAmount, OrderStatus.REFUNDED, createdAt, paidAt,
-                paymentReference, shippedAt);
+                paymentReference, shippedAt, shippingAddress);
     }
 
     public Order markShipped(Instant when) {
         return new Order(id, buyerId, auctionId, items, totalAmount, status, createdAt, paidAt, paymentReference,
-                when);
+                when, shippingAddress);
+    }
+
+    public Order withShippingAddress(ShippingAddress address) {
+        return new Order(id, buyerId, auctionId, items, totalAmount, status, createdAt, paidAt, paymentReference,
+                shippedAt, address);
     }
 
     // Null when the order spans items from more than one seller (a direct-purchase cart can
@@ -96,4 +112,5 @@ public class Order {
     public Instant getPaidAt() { return paidAt; }
     public String getPaymentReference() { return paymentReference; }
     public Instant getShippedAt() { return shippedAt; }
+    public ShippingAddress getShippingAddress() { return shippingAddress; }
 }

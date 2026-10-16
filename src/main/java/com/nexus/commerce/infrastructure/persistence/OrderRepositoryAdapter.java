@@ -4,6 +4,7 @@ import com.nexus.commerce.application.port.out.OrderRepositoryPort;
 import com.nexus.commerce.domain.model.Order;
 import com.nexus.commerce.domain.model.OrderItem;
 import com.nexus.commerce.domain.model.OrderStatus;
+import com.nexus.commerce.domain.model.ShippingAddress;
 import com.nexus.commerce.infrastructure.persistence.entity.OrderItemEmbeddable;
 import com.nexus.commerce.infrastructure.persistence.entity.OrderJpaEntity;
 import org.springframework.stereotype.Component;
@@ -63,11 +64,23 @@ public class OrderRepositoryAdapter implements OrderRepositoryPort {
                 .map(i -> new OrderItemEmbeddable(i.getProductId(), i.getSellerId(), i.getProductName(),
                         i.getUnitPrice(), i.getQuantity()))
                 .toList();
+        ShippingAddress address = order.getShippingAddress();
         OrderJpaEntity entity = new OrderJpaEntity(UUID.fromString(order.getId()), order.getBuyerId(),
                 order.getAuctionId(), items, order.getTotalAmount(), order.getStatus().name(),
-                order.getCreatedAt(), order.getPaidAt(), order.getPaymentReference(), order.getShippedAt());
+                order.getCreatedAt(), order.getPaidAt(), order.getPaymentReference(), order.getShippedAt(),
+                address == null ? null : address.recipientName(), address == null ? null : address.phone(),
+                address == null ? null : address.addressLine(), address == null ? null : address.city());
         jpaRepository.save(entity);
         return order;
+    }
+
+    // All four columns are written together, so a null recipient name means "no address set".
+    private static ShippingAddress shippingAddressOf(OrderJpaEntity entity) {
+        if (entity.getShipRecipientName() == null) {
+            return null;
+        }
+        return new ShippingAddress(entity.getShipRecipientName(), entity.getShipPhone(),
+                entity.getShipAddressLine(), entity.getShipCity());
     }
 
     private Order toDomain(OrderJpaEntity entity) {
@@ -77,6 +90,6 @@ public class OrderRepositoryAdapter implements OrderRepositoryPort {
                 .toList();
         return Order.reconstitute(entity.getId().toString(), entity.getBuyerId(), entity.getAuctionId(), items,
                 entity.getTotalAmount(), OrderStatus.valueOf(entity.getStatus()), entity.getCreatedAt(),
-                entity.getPaidAt(), entity.getPaymentReference(), entity.getShippedAt());
+                entity.getPaidAt(), entity.getPaymentReference(), entity.getShippedAt(), shippingAddressOf(entity));
     }
 }

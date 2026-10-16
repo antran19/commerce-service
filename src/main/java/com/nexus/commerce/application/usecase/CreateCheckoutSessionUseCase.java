@@ -34,6 +34,11 @@ public class CreateCheckoutSessionUseCase {
                     "Order " + orderId + " is not awaiting payment");
         }
 
+        // The seller needs to know where to ship, so no payment before an address is set.
+        if (order.getShippingAddress() == null) {
+            throw new ConflictException("SHIPPING_ADDRESS_REQUIRED",
+                    "Set a shipping address for order " + orderId + " before paying");
+        }
         List<PaymentGatewayPort.LineItem> lineItems = order.getItems().stream()
                 .map(i -> new PaymentGatewayPort.LineItem(i.getProductName(), i.getUnitPrice(), i.getQuantity()))
                 .toList();
