@@ -4,6 +4,7 @@ import com.nexus.commerce.application.port.out.CartRepositoryPort;
 import com.nexus.commerce.application.port.out.EventPublisherPort;
 import com.nexus.commerce.application.port.out.OrderRepositoryPort;
 import com.nexus.commerce.application.port.out.ProductSnapshotRepositoryPort;
+import com.nexus.commerce.application.port.out.ProductStockRepositoryPort;
 import com.nexus.commerce.domain.model.Cart;
 import com.nexus.commerce.domain.model.CartItem;
 import com.nexus.commerce.domain.model.Order;
@@ -27,6 +28,7 @@ class StartCheckoutUseCaseTest {
     private OrderRepositoryPort orderRepositoryPort;
     private EventPublisherPort eventPublisherPort;
     private ProductSnapshotRepositoryPort productSnapshotRepositoryPort;
+    private ProductStockRepositoryPort productStockRepositoryPort;
     private StartCheckoutUseCase useCase;
 
     @BeforeEach
@@ -35,8 +37,11 @@ class StartCheckoutUseCaseTest {
         orderRepositoryPort = mock(OrderRepositoryPort.class);
         eventPublisherPort = mock(EventPublisherPort.class);
         productSnapshotRepositoryPort = mock(ProductSnapshotRepositoryPort.class);
+        productStockRepositoryPort = mock(ProductStockRepositoryPort.class);
         useCase = new StartCheckoutUseCase(cartRepositoryPort, orderRepositoryPort, eventPublisherPort,
-                productSnapshotRepositoryPort);
+                productSnapshotRepositoryPort, productStockRepositoryPort);
+        when(productStockRepositoryPort.availableQuantity("product-1")).thenReturn(10);
+        when(productStockRepositoryPort.availableQuantity("product-2")).thenReturn(10);
         when(productSnapshotRepositoryPort.findById("product-1")).thenReturn(Optional.of(
                 ProductSnapshot.create("product-1", "seller-1", "Laptop X", new BigDecimal("999.00"))
                         .withStatus("ACTIVE")));
@@ -112,5 +117,21 @@ class StartCheckoutUseCaseTest {
         verify(orderRepositoryPort, never()).save(any());
         verify(cartRepositoryPort, never()).save(any());
         verify(eventPublisherPort, never()).publish(any());
+    }
+
+    @Test
+    void checkout_rejectsWhenStockDroppedBelowTheCartQuantity_andKeepsTheCart() {
+        // Someone else bought most of it after this buyer filled the cart.
+        when(productStockRepositoryPort.availableQuantity("product-1")).thenReturn(2);
+        Cart cart = Cart.create("buyer-1")
+                .addItem(CartItem.create("product-1", "seller-1", "Laptop X", new BigDecimal("999.00"), 3));
+        when(cartRepositoryPort.findByBuyerId("buyer-1")).thenReturn(Optional.of(cart));
+
+        assertThatThrownBy(() -> useCase.checkout("buyer-1"))
+                .isInstanceOf(ConflictException.class)
+                .hasFieldOrPropertyWithValue("errorCode", "INSUFFICIENT_STOCK")
+                .hasMessageContaining("product-1");
+        verify(orderRepositoryPort, never()).save(any());
+        verify(cartRepositoryPort, never()).save(any());
     }
 }

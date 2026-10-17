@@ -2,6 +2,7 @@ package com.nexus.commerce.application.usecase;
 
 import com.nexus.commerce.application.port.out.CartRepositoryPort;
 import com.nexus.commerce.application.port.out.ProductSnapshotRepositoryPort;
+import com.nexus.commerce.application.port.out.ProductStockRepositoryPort;
 import com.nexus.commerce.domain.model.Cart;
 import com.nexus.commerce.domain.model.CartItem;
 import com.nexus.commerce.domain.model.ProductSnapshot;
@@ -24,13 +25,16 @@ class AddCartItemUseCaseTest {
 
     private CartRepositoryPort cartRepositoryPort;
     private ProductSnapshotRepositoryPort productSnapshotRepositoryPort;
+    private ProductStockRepositoryPort productStockRepositoryPort;
     private AddCartItemUseCase useCase;
 
     @BeforeEach
     void setUp() {
         cartRepositoryPort = mock(CartRepositoryPort.class);
         productSnapshotRepositoryPort = mock(ProductSnapshotRepositoryPort.class);
-        useCase = new AddCartItemUseCase(cartRepositoryPort, productSnapshotRepositoryPort);
+        productStockRepositoryPort = mock(ProductStockRepositoryPort.class);
+        useCase = new AddCartItemUseCase(cartRepositoryPort, productSnapshotRepositoryPort, productStockRepositoryPort);
+        when(productStockRepositoryPort.availableQuantity("product-1")).thenReturn(10);
         when(cartRepositoryPort.save(any(Cart.class))).thenAnswer(inv -> inv.getArgument(0));
         when(productSnapshotRepositoryPort.findById("product-1")).thenReturn(Optional.of(
                 ProductSnapshot.create("product-1", "seller-1", "Laptop X", new BigDecimal("999.00"))
@@ -92,5 +96,38 @@ class AddCartItemUseCaseTest {
                 .isInstanceOf(ConflictException.class)
                 .hasFieldOrPropertyWithValue("errorCode", "PRODUCT_NOT_AVAILABLE");
         verify(cartRepositoryPort, never()).save(any());
+    }
+
+    @Test
+    void addItem_rejectsWhenCartPlusNewQuantityExceedsAvailableStock() {
+        Cart existing = Cart.create("buyer-1")
+                .addItem(CartItem.create("product-1", "seller-1", "Laptop X", new BigDecimal("999.00"), 8));
+        when(cartRepositoryPort.findByBuyerId("buyer-1")).thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> useCase.addItem("buyer-1", "product-1", 3))
+                .isInstanceOf(ConflictException.class)
+                .hasFieldOrPropertyWithValue("errorCode", "INSUFFICIENT_STOCK")
+                .hasMessageContaining("10");
+        verify(cartRepositoryPort, never()).save(any());
+    }
+
+    @Test
+    void addItem_allowsTakingExactlyTheAvailableStock() {
+        Cart existing = Cart.create("buyer-1")
+                .addItem(CartItem.create("product-1", "seller-1", "Laptop X", new BigDecimal("999.00"), 8));
+        when(cartRepositoryPort.findByBuyerId("buyer-1")).thenReturn(Optional.of(existing));
+
+        CartResult result = useCase.addItem("buyer-1", "product-1", 2);
+
+        assertThat(result.items().get(0).quantity()).isEqualTo(10);
+    }
+
+    @Test
+    void addItem_productWithNoKnownStock_countsAsZero() {
+        when(cartRepositoryPort.findByBuyerId("buyer-1")).thenReturn(Optional.empty());
+        when(productStockRepositoryPort.availableQuantity("product-1")).thenReturn(0);
+
+        assertThatThrownBy(() -> useCase.addItem("buyer-1", "product-1", 1))
+                .hasFieldOrPropertyWithValue("errorCode", "INSUFFICIENT_STOCK");
     }
 }

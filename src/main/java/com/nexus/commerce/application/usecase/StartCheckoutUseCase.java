@@ -4,6 +4,7 @@ import com.nexus.commerce.application.port.out.CartRepositoryPort;
 import com.nexus.commerce.application.port.out.EventPublisherPort;
 import com.nexus.commerce.application.port.out.OrderRepositoryPort;
 import com.nexus.commerce.application.port.out.ProductSnapshotRepositoryPort;
+import com.nexus.commerce.application.port.out.ProductStockRepositoryPort;
 import com.nexus.commerce.domain.model.Cart;
 import com.nexus.commerce.domain.model.CartItem;
 import com.nexus.commerce.domain.model.Order;
@@ -22,14 +23,17 @@ public class StartCheckoutUseCase {
     private final OrderRepositoryPort orderRepositoryPort;
     private final EventPublisherPort eventPublisherPort;
     private final ProductSnapshotRepositoryPort productSnapshotRepositoryPort;
+    private final ProductStockRepositoryPort productStockRepositoryPort;
 
     public StartCheckoutUseCase(CartRepositoryPort cartRepositoryPort, OrderRepositoryPort orderRepositoryPort,
                                  EventPublisherPort eventPublisherPort,
-                                 ProductSnapshotRepositoryPort productSnapshotRepositoryPort) {
+                                 ProductSnapshotRepositoryPort productSnapshotRepositoryPort,
+                                 ProductStockRepositoryPort productStockRepositoryPort) {
         this.cartRepositoryPort = cartRepositoryPort;
         this.orderRepositoryPort = orderRepositoryPort;
         this.eventPublisherPort = eventPublisherPort;
         this.productSnapshotRepositoryPort = productSnapshotRepositoryPort;
+        this.productStockRepositoryPort = productStockRepositoryPort;
     }
 
     public OrderResult checkout(String buyerId) {
@@ -51,13 +55,16 @@ public class StartCheckoutUseCase {
 
     // Re-reads price, name and seller from the catalog copy: the product may have been taken off
     // sale since it was added, and carts filled before prices were checked server-side may still
-    // hold a price the client made up. Throws before anything is saved, so the cart is kept.
+    // hold a price the client made up; stock may also have dropped below the cart quantity.
+    // Throws before anything is saved, so the cart is kept.
     private CartItem repriced(CartItem item) {
-        return productSnapshotRepositoryPort.findById(item.getProductId())
+        CartItem current = productSnapshotRepositoryPort.findById(item.getProductId())
                 .filter(ProductSnapshot::isPurchasable)
                 .map(p -> p.toCartItem(item.getQuantity()))
                 .orElseThrow(() -> new ConflictException("CART_ITEM_UNAVAILABLE",
                         "Product in the cart is no longer available: " + item.getProductId()));
+        StockGuard.requireAvailable(productStockRepositoryPort, item.getProductId(), item.getQuantity());
+        return current;
     }
 
     // Stock is keyed by the PRODUCT id: this productId is sent in the "skuId" field of the event

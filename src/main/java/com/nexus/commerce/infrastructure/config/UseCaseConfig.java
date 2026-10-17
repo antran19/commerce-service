@@ -5,6 +5,7 @@ import com.nexus.commerce.application.port.out.EventPublisherPort;
 import com.nexus.commerce.application.port.out.OrderRepositoryPort;
 import com.nexus.commerce.application.port.out.PaymentGatewayPort;
 import com.nexus.commerce.application.port.out.ProductSnapshotRepositoryPort;
+import com.nexus.commerce.application.port.out.ProductStockRepositoryPort;
 import com.nexus.commerce.application.port.out.ReturnRequestRepositoryPort;
 import com.nexus.commerce.application.usecase.*;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,13 +17,15 @@ public class UseCaseConfig {
 
     @Bean
     public AddCartItemUseCase addCartItemUseCase(CartRepositoryPort cartRepositoryPort,
-                                                 ProductSnapshotRepositoryPort productSnapshotRepositoryPort) {
-        return new AddCartItemUseCase(cartRepositoryPort, productSnapshotRepositoryPort);
+                                                 ProductSnapshotRepositoryPort productSnapshotRepositoryPort,
+                                                 ProductStockRepositoryPort productStockRepositoryPort) {
+        return new AddCartItemUseCase(cartRepositoryPort, productSnapshotRepositoryPort, productStockRepositoryPort);
     }
 
     @Bean
-    public UpdateCartItemUseCase updateCartItemUseCase(CartRepositoryPort cartRepositoryPort) {
-        return new UpdateCartItemUseCase(cartRepositoryPort);
+    public UpdateCartItemUseCase updateCartItemUseCase(CartRepositoryPort cartRepositoryPort,
+                                                       ProductStockRepositoryPort productStockRepositoryPort) {
+        return new UpdateCartItemUseCase(cartRepositoryPort, productStockRepositoryPort);
     }
 
     @Bean
@@ -39,9 +42,15 @@ public class UseCaseConfig {
     public StartCheckoutUseCase startCheckoutUseCase(CartRepositoryPort cartRepositoryPort,
                                                        OrderRepositoryPort orderRepositoryPort,
                                                        EventPublisherPort eventPublisherPort,
-                                                       ProductSnapshotRepositoryPort productSnapshotRepositoryPort) {
+                                                       ProductSnapshotRepositoryPort productSnapshotRepositoryPort,
+                                                       ProductStockRepositoryPort productStockRepositoryPort) {
         return new StartCheckoutUseCase(cartRepositoryPort, orderRepositoryPort, eventPublisherPort,
-                productSnapshotRepositoryPort);
+                productSnapshotRepositoryPort, productStockRepositoryPort);
+    }
+
+    @Bean
+    public SyncProductStockUseCase syncProductStockUseCase(ProductStockRepositoryPort productStockRepositoryPort) {
+        return new SyncProductStockUseCase(productStockRepositoryPort);
     }
 
     @Bean
