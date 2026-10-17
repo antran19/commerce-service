@@ -4,6 +4,7 @@ import com.nexus.commerce.application.port.out.CartRepositoryPort;
 import com.nexus.commerce.application.port.out.EventPublisherPort;
 import com.nexus.commerce.application.port.out.OrderRepositoryPort;
 import com.nexus.commerce.application.port.out.PaymentGatewayPort;
+import com.nexus.commerce.application.port.out.ProductSnapshotRepositoryPort;
 import com.nexus.commerce.application.port.out.ReturnRequestRepositoryPort;
 import com.nexus.commerce.application.usecase.*;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,8 +15,9 @@ import org.springframework.context.annotation.Configuration;
 public class UseCaseConfig {
 
     @Bean
-    public AddCartItemUseCase addCartItemUseCase(CartRepositoryPort cartRepositoryPort) {
-        return new AddCartItemUseCase(cartRepositoryPort);
+    public AddCartItemUseCase addCartItemUseCase(CartRepositoryPort cartRepositoryPort,
+                                                 ProductSnapshotRepositoryPort productSnapshotRepositoryPort) {
+        return new AddCartItemUseCase(cartRepositoryPort, productSnapshotRepositoryPort);
     }
 
     @Bean
@@ -36,8 +38,15 @@ public class UseCaseConfig {
     @Bean
     public StartCheckoutUseCase startCheckoutUseCase(CartRepositoryPort cartRepositoryPort,
                                                        OrderRepositoryPort orderRepositoryPort,
-                                                       EventPublisherPort eventPublisherPort) {
-        return new StartCheckoutUseCase(cartRepositoryPort, orderRepositoryPort, eventPublisherPort);
+                                                       EventPublisherPort eventPublisherPort,
+                                                       ProductSnapshotRepositoryPort productSnapshotRepositoryPort) {
+        return new StartCheckoutUseCase(cartRepositoryPort, orderRepositoryPort, eventPublisherPort,
+                productSnapshotRepositoryPort);
+    }
+
+    @Bean
+    public SyncProductSnapshotUseCase syncProductSnapshotUseCase(ProductSnapshotRepositoryPort productSnapshotRepositoryPort) {
+        return new SyncProductSnapshotUseCase(productSnapshotRepositoryPort);
     }
 
     @Bean

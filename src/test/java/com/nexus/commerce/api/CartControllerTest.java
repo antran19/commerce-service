@@ -74,20 +74,36 @@ class CartControllerTest {
     @Test
     void addItem_returns200AndUsesJwtSubjectAsBuyerId() throws Exception {
         authenticateAs("buyer-1", "CART.CREATE");
-        when(addCartItemUseCase.addItem("buyer-1", "product-1", "seller-1", "Laptop X",
-                new BigDecimal("999.00"), 1))
-                .thenReturn(new CartResult("cart-1", "buyer-1",
-                        List.of(new CartItemResult("product-1", "seller-1", "Laptop X",
-                                new BigDecimal("999.00"), 1, new BigDecimal("999.00"))),
-                        new BigDecimal("999.00")));
+        when(addCartItemUseCase.addItem("buyer-1", "product-1", 1)).thenReturn(laptopCart());
 
         mockMvc.perform(post("/api/v1/carts/items")
                         .header("Authorization", "Bearer good-token")
                         .contentType(APPLICATION_JSON)
                         .content("""
-                                {"productId":"product-1","sellerId":"seller-1","productName":"Laptop X",
-                                 "unitPrice":999.00,"quantity":1}"""))
+                                {"productId":"product-1","quantity":1}"""))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.totalAmount").value(999.00));
+    }
+
+    @Test
+    void addItem_stillAcceptsTheOldBody_butIgnoresClientPriceNameAndSeller() throws Exception {
+        authenticateAs("buyer-1", "CART.CREATE");
+        when(addCartItemUseCase.addItem("buyer-1", "product-1", 1)).thenReturn(laptopCart());
+
+        mockMvc.perform(post("/api/v1/carts/items")
+                        .header("Authorization", "Bearer good-token")
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"productId":"product-1","sellerId":"someone-else","productName":"Fake",
+                                 "unitPrice":1,"quantity":1}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalAmount").value(999.00));
+    }
+
+    private static CartResult laptopCart() {
+        return new CartResult("cart-1", "buyer-1",
+                List.of(new CartItemResult("product-1", "seller-1", "Laptop X",
+                        new BigDecimal("999.00"), 1, new BigDecimal("999.00"))),
+                new BigDecimal("999.00"));
     }
 }

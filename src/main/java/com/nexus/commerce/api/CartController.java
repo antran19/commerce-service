@@ -44,7 +44,7 @@ public class CartController {
     public ResponseEntity<ApiResponse<CartResponse>> addItem(Authentication authentication,
                                                                @Valid @RequestBody AddCartItemRequest request) {
         CartResult result = addCartItemUseCase.addItem(buyerId(authentication), request.productId(),
-                request.sellerId(), request.productName(), request.unitPrice(), request.quantity());
+                request.quantity());
         return ResponseEntity.ok(ApiResponse.ok(mapper.toResponse(result)));
     }
 

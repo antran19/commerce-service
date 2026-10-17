@@ -1,16 +1,17 @@
 package com.nexus.commerce.api.dto.request;
 
-import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
 
+// Only productId and quantity are used. sellerId/productName/unitPrice are still accepted so
+// older clients keep working, but they are ignored: commerce prices the item from its own copy
+// of the catalog (see AddCartItemUseCase).
 public record AddCartItemRequest(
         @NotBlank String productId,
-        @NotBlank String sellerId,
-        @NotBlank String productName,
-        @NotNull @DecimalMin(value = "0.01", message = "unitPrice must be greater than zero") BigDecimal unitPrice,
+        String sellerId,
+        String productName,
+        BigDecimal unitPrice,
         @Min(value = 1, message = "quantity must be at least 1") int quantity) {
 }
