@@ -41,11 +41,18 @@ class CreateOrderFromAuctionUseCaseTest {
         assertThat(result.auctionId()).isEqualTo("auction-1");
         assertThat(result.buyerId()).isEqualTo("winner-1");
         assertThat(result.totalAmount()).isEqualByComparingTo("150.00");
-        verify(eventPublisherPort, times(2)).publish(any());
-        verify(eventPublisherPort).publish(argThat(e -> e instanceof InventoryReservationRequestedEvent evt
-                && evt.getItems().size() == 1
-                && evt.getItems().get(0).skuId().equals("product-1")
-                && evt.getItems().get(0).quantity() == 1));
+        verify(eventPublisherPort, times(1)).publish(any());
+    }
+
+    @Test
+    void createFromAuction_doesNotAskForStock_theUnitIsAlreadyHeldForTheAuction() {
+        // fulfillment has held the unit since the auction was created; asking again would hold a
+        // second one (or fail, the only unit being held) and cancel the winner's order.
+        when(orderRepositoryPort.findByAuctionId("auction-1")).thenReturn(Optional.empty());
+
+        useCase.createFromAuction("auction-1", "product-1", "seller-1", "winner-1", new BigDecimal("150.00"));
+
+        verify(eventPublisherPort, never()).publish(argThat(e -> e instanceof InventoryReservationRequestedEvent));
     }
 
     @Test

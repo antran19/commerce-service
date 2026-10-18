@@ -4,9 +4,7 @@ import com.nexus.commerce.application.port.out.EventPublisherPort;
 import com.nexus.commerce.application.port.out.OrderRepositoryPort;
 import com.nexus.commerce.domain.model.Order;
 import com.nexus.commerce.domain.model.OrderItem;
-import com.nexus.common.events.InventoryReservationRequestedEvent;
 import com.nexus.common.events.OrderCreatedEvent;
-import com.nexus.common.events.ReservationLineItem;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -41,10 +39,12 @@ public class CreateOrderFromAuctionUseCase {
         Order order = Order.create(winnerId, auctionId, List.of(item));
         Order saved = orderRepositoryPort.save(order);
 
+        // No InventoryReservationRequested here, unlike checkout: fulfillment has held the unit
+        // since the auction was created, and commits that hold when this order is paid. Asking
+        // again would hold a second unit -- or fail, the only one being held -- and cancel the
+        // winner's order.
         eventPublisherPort.publish(new OrderCreatedEvent(saved.getId(), auctionId, productId, sellerId,
                 winnerId, saved.getTotalAmount()));
-        eventPublisherPort.publish(new InventoryReservationRequestedEvent(saved.getId(),
-                List.of(new ReservationLineItem(productId, 1))));
         return OrderResult.from(saved);
     }
 }

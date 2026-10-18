@@ -49,6 +49,12 @@ public class UseCaseConfig {
     }
 
     @Bean
+    public CancelDefaultedAuctionOrderUseCase cancelDefaultedAuctionOrderUseCase(OrderRepositoryPort orderRepositoryPort,
+                                                                                 EventPublisherPort eventPublisherPort) {
+        return new CancelDefaultedAuctionOrderUseCase(orderRepositoryPort, eventPublisherPort);
+    }
+
+    @Bean
     public SyncProductStockUseCase syncProductStockUseCase(ProductStockRepositoryPort productStockRepositoryPort) {
         return new SyncProductStockUseCase(productStockRepositoryPort);
     }

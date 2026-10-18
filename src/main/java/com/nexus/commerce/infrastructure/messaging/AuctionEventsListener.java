@@ -2,7 +2,9 @@ package com.nexus.commerce.infrastructure.messaging;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nexus.commerce.application.usecase.CancelDefaultedAuctionOrderUseCase;
 import com.nexus.commerce.application.usecase.CreateOrderFromAuctionUseCase;
+import com.nexus.common.events.AuctionPaymentTimeoutEvent;
 import com.nexus.common.events.AuctionWonEvent;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
@@ -17,11 +19,14 @@ public class AuctionEventsListener {
 
     private final ObjectMapper objectMapper;
     private final CreateOrderFromAuctionUseCase createOrderFromAuctionUseCase;
+    private final CancelDefaultedAuctionOrderUseCase cancelDefaultedAuctionOrderUseCase;
 
     public AuctionEventsListener(ObjectMapper objectMapper,
-                                  CreateOrderFromAuctionUseCase createOrderFromAuctionUseCase) {
+                                  CreateOrderFromAuctionUseCase createOrderFromAuctionUseCase,
+                                  CancelDefaultedAuctionOrderUseCase cancelDefaultedAuctionOrderUseCase) {
         this.objectMapper = objectMapper;
         this.createOrderFromAuctionUseCase = createOrderFromAuctionUseCase;
+        this.cancelDefaultedAuctionOrderUseCase = cancelDefaultedAuctionOrderUseCase;
     }
 
     // Exceptions are NOT caught here on purpose: KafkaErrorHandlingConfig retries them, then
@@ -29,11 +34,13 @@ public class AuctionEventsListener {
     @KafkaListener(topics = "auction-events")
     public void onMessage(String rawPayload) throws JsonProcessingException {
         String eventType = objectMapper.readTree(rawPayload).path("eventType").asText();
-        if (!"AuctionWon".equals(eventType)) {
-            return;
+        if ("AuctionWon".equals(eventType)) {
+            AuctionWonEvent event = objectMapper.readValue(rawPayload, AuctionWonEvent.class);
+            createOrderFromAuctionUseCase.createFromAuction(event.getAuctionId(), event.getProductId(),
+                    event.getSellerId(), event.getWinnerId(), event.getFinalPrice());
+        } else if ("AuctionPaymentTimeout".equals(eventType)) {
+            AuctionPaymentTimeoutEvent event = objectMapper.readValue(rawPayload, AuctionPaymentTimeoutEvent.class);
+            cancelDefaultedAuctionOrderUseCase.cancel(event.getAuctionId());
         }
-        AuctionWonEvent event = objectMapper.readValue(rawPayload, AuctionWonEvent.class);
-        createOrderFromAuctionUseCase.createFromAuction(event.getAuctionId(), event.getProductId(),
-                event.getSellerId(), event.getWinnerId(), event.getFinalPrice());
     }
 }
