@@ -27,6 +27,11 @@ public class CartRepositoryAdapter implements CartRepositoryPort {
     }
 
     @Override
+    public Optional<Cart> findByBuyerIdForUpdate(String buyerId) {
+        return jpaRepository.findByBuyerIdForUpdate(buyerId).map(this::toDomain);
+    }
+
+    @Override
     public Cart save(Cart cart) {
         List<CartItemEmbeddable> items = cart.getItems().stream()
                 .map(i -> new CartItemEmbeddable(i.getProductId(), i.getSellerId(), i.getProductName(),

@@ -1,6 +1,7 @@
 package com.nexus.commerce.application.usecase;
 
 import com.nexus.commerce.application.port.out.CartRepositoryPort;
+import com.nexus.commerce.application.port.out.CheckoutRequestRepositoryPort;
 import com.nexus.commerce.application.port.out.EventPublisherPort;
 import com.nexus.commerce.application.port.out.OrderRepositoryPort;
 import com.nexus.commerce.application.port.out.ProductSnapshotRepositoryPort;
@@ -10,6 +11,7 @@ import com.nexus.commerce.domain.model.CartItem;
 import com.nexus.commerce.domain.model.Order;
 import com.nexus.commerce.domain.model.ProductSnapshot;
 import com.nexus.common.core.exception.ConflictException;
+import com.nexus.common.core.exception.ValidationException;
 import com.nexus.common.events.InventoryReservationRequestedEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,6 +31,7 @@ class StartCheckoutUseCaseTest {
     private EventPublisherPort eventPublisherPort;
     private ProductSnapshotRepositoryPort productSnapshotRepositoryPort;
     private ProductStockRepositoryPort productStockRepositoryPort;
+    private CheckoutRequestRepositoryPort checkoutRequestRepositoryPort;
     private StartCheckoutUseCase useCase;
 
     @BeforeEach
@@ -38,8 +41,9 @@ class StartCheckoutUseCaseTest {
         eventPublisherPort = mock(EventPublisherPort.class);
         productSnapshotRepositoryPort = mock(ProductSnapshotRepositoryPort.class);
         productStockRepositoryPort = mock(ProductStockRepositoryPort.class);
+        checkoutRequestRepositoryPort = mock(CheckoutRequestRepositoryPort.class);
         useCase = new StartCheckoutUseCase(cartRepositoryPort, orderRepositoryPort, eventPublisherPort,
-                productSnapshotRepositoryPort, productStockRepositoryPort);
+                productSnapshotRepositoryPort, productStockRepositoryPort, checkoutRequestRepositoryPort);
         when(productStockRepositoryPort.availableQuantity("product-1")).thenReturn(10);
         when(productStockRepositoryPort.availableQuantity("product-2")).thenReturn(10);
         when(productSnapshotRepositoryPort.findById("product-1")).thenReturn(Optional.of(
@@ -53,9 +57,9 @@ class StartCheckoutUseCaseTest {
     void checkout_createsOrderAndClearsCart() {
         Cart cart = Cart.create("buyer-1")
                 .addItem(CartItem.create("product-1", "seller-1", "Laptop X", new BigDecimal("999.00"), 1));
-        when(cartRepositoryPort.findByBuyerId("buyer-1")).thenReturn(Optional.of(cart));
+        when(cartRepositoryPort.findByBuyerIdForUpdate("buyer-1")).thenReturn(Optional.of(cart));
 
-        OrderResult result = useCase.checkout("buyer-1");
+        OrderResult result = useCase.checkout("buyer-1", null);
 
         assertThat(result.buyerId()).isEqualTo("buyer-1");
         assertThat(result.auctionId()).isNull();
@@ -68,9 +72,9 @@ class StartCheckoutUseCaseTest {
     void checkout_publishesAnInventoryReservationRequestWithOneLineItemPerProduct() {
         Cart cart = Cart.create("buyer-1")
                 .addItem(CartItem.create("product-1", "seller-1", "Laptop X", new BigDecimal("999.00"), 2));
-        when(cartRepositoryPort.findByBuyerId("buyer-1")).thenReturn(Optional.of(cart));
+        when(cartRepositoryPort.findByBuyerIdForUpdate("buyer-1")).thenReturn(Optional.of(cart));
 
-        useCase.checkout("buyer-1");
+        useCase.checkout("buyer-1", null);
 
         verify(eventPublisherPort).publish(argThat(e -> e instanceof InventoryReservationRequestedEvent evt
                 && evt.getItems().size() == 1
@@ -80,9 +84,9 @@ class StartCheckoutUseCaseTest {
 
     @Test
     void checkout_rejectsEmptyCart() {
-        when(cartRepositoryPort.findByBuyerId("buyer-1")).thenReturn(Optional.of(Cart.create("buyer-1")));
+        when(cartRepositoryPort.findByBuyerIdForUpdate("buyer-1")).thenReturn(Optional.of(Cart.create("buyer-1")));
 
-        assertThatThrownBy(() -> useCase.checkout("buyer-1")).isInstanceOf(ConflictException.class);
+        assertThatThrownBy(() -> useCase.checkout("buyer-1", null)).isInstanceOf(ConflictException.class);
         verify(orderRepositoryPort, never()).save(any());
     }
 
@@ -91,9 +95,9 @@ class StartCheckoutUseCaseTest {
         // A cart filled before prices were checked server-side may hold a price the client made up.
         Cart cart = Cart.create("buyer-1")
                 .addItem(CartItem.create("product-1", "someone-else", "Fake name", new BigDecimal("1.00"), 2));
-        when(cartRepositoryPort.findByBuyerId("buyer-1")).thenReturn(Optional.of(cart));
+        when(cartRepositoryPort.findByBuyerIdForUpdate("buyer-1")).thenReturn(Optional.of(cart));
 
-        OrderResult result = useCase.checkout("buyer-1");
+        OrderResult result = useCase.checkout("buyer-1", null);
 
         assertThat(result.totalAmount()).isEqualByComparingTo("1998.00");
         assertThat(result.items().get(0).unitPrice()).isEqualByComparingTo("999.00");
@@ -108,9 +112,9 @@ class StartCheckoutUseCaseTest {
         Cart cart = Cart.create("buyer-1")
                 .addItem(CartItem.create("product-1", "seller-1", "Laptop X", new BigDecimal("999.00"), 1))
                 .addItem(CartItem.create("product-2", "seller-1", "Phone", new BigDecimal("10.00"), 1));
-        when(cartRepositoryPort.findByBuyerId("buyer-1")).thenReturn(Optional.of(cart));
+        when(cartRepositoryPort.findByBuyerIdForUpdate("buyer-1")).thenReturn(Optional.of(cart));
 
-        assertThatThrownBy(() -> useCase.checkout("buyer-1"))
+        assertThatThrownBy(() -> useCase.checkout("buyer-1", null))
                 .isInstanceOf(ConflictException.class)
                 .hasFieldOrPropertyWithValue("errorCode", "CART_ITEM_UNAVAILABLE")
                 .hasMessageContaining("product-2");
@@ -125,13 +129,98 @@ class StartCheckoutUseCaseTest {
         when(productStockRepositoryPort.availableQuantity("product-1")).thenReturn(2);
         Cart cart = Cart.create("buyer-1")
                 .addItem(CartItem.create("product-1", "seller-1", "Laptop X", new BigDecimal("999.00"), 3));
-        when(cartRepositoryPort.findByBuyerId("buyer-1")).thenReturn(Optional.of(cart));
+        when(cartRepositoryPort.findByBuyerIdForUpdate("buyer-1")).thenReturn(Optional.of(cart));
 
-        assertThatThrownBy(() -> useCase.checkout("buyer-1"))
+        assertThatThrownBy(() -> useCase.checkout("buyer-1", null))
                 .isInstanceOf(ConflictException.class)
                 .hasFieldOrPropertyWithValue("errorCode", "INSUFFICIENT_STOCK")
                 .hasMessageContaining("product-1");
         verify(orderRepositoryPort, never()).save(any());
         verify(cartRepositoryPort, never()).save(any());
+    }
+
+    private Cart cartWithOneLaptop() {
+        return Cart.create("buyer-1")
+                .addItem(CartItem.create("product-1", "seller-1", "Laptop X", new BigDecimal("999.00"), 1));
+    }
+
+    // The cart row is locked before anything is read or written, so a double click is serialized.
+    @Test
+    void checkout_locksTheCartInsteadOfReadingItPlainly() {
+        when(cartRepositoryPort.findByBuyerIdForUpdate("buyer-1")).thenReturn(Optional.of(cartWithOneLaptop()));
+
+        useCase.checkout("buyer-1", null);
+
+        verify(cartRepositoryPort).findByBuyerIdForUpdate("buyer-1");
+        verify(cartRepositoryPort, never()).findByBuyerId(any());
+        verifyNoInteractions(checkoutRequestRepositoryPort);
+    }
+
+    @Test
+    void checkout_withKey_createsTheOrderAndRemembersTheKey() {
+        when(cartRepositoryPort.findByBuyerIdForUpdate("buyer-1")).thenReturn(Optional.of(cartWithOneLaptop()));
+        when(checkoutRequestRepositoryPort.findOrderId("buyer-1", "key-1")).thenReturn(Optional.empty());
+
+        OrderResult result = useCase.checkout("buyer-1", "key-1");
+
+        verify(checkoutRequestRepositoryPort).save("buyer-1", "key-1", result.id());
+        verify(eventPublisherPort, times(2)).publish(any());
+    }
+
+    // The client retries after a slow response: it must get the first order back, not a second
+    // order and not a confusing CART_EMPTY (the cart was already emptied by the first request).
+    @Test
+    void checkout_sameKeyAgain_returnsTheFirstOrderAndCreatesNothing() {
+        Order firstOrder = Order.create("buyer-1", null, java.util.List.of(
+                com.nexus.commerce.domain.model.OrderItem.fromCartItem(
+                        CartItem.create("product-1", "seller-1", "Laptop X", new BigDecimal("999.00"), 1))));
+        when(cartRepositoryPort.findByBuyerIdForUpdate("buyer-1")).thenReturn(Optional.of(Cart.create("buyer-1")));
+        when(checkoutRequestRepositoryPort.findOrderId("buyer-1", "key-1")).thenReturn(Optional.of(firstOrder.getId()));
+        when(orderRepositoryPort.findById(firstOrder.getId())).thenReturn(Optional.of(firstOrder));
+
+        OrderResult result = useCase.checkout("buyer-1", "key-1");
+
+        assertThat(result.id()).isEqualTo(firstOrder.getId());
+        verify(orderRepositoryPort, never()).save(any());
+        verify(cartRepositoryPort, never()).save(any());
+        verify(eventPublisherPort, never()).publish(any());
+        verify(checkoutRequestRepositoryPort, never()).save(any(), any(), any());
+    }
+
+    @Test
+    void checkout_blankKeyIsTreatedAsNoKey() {
+        when(cartRepositoryPort.findByBuyerIdForUpdate("buyer-1")).thenReturn(Optional.of(cartWithOneLaptop()));
+
+        useCase.checkout("buyer-1", "   ");
+
+        verifyNoInteractions(checkoutRequestRepositoryPort);
+    }
+
+    @Test
+    void checkout_keyIsTrimmedBeforeItIsLookedUp() {
+        when(cartRepositoryPort.findByBuyerIdForUpdate("buyer-1")).thenReturn(Optional.of(cartWithOneLaptop()));
+
+        useCase.checkout("buyer-1", "  key-1  ");
+
+        verify(checkoutRequestRepositoryPort).findOrderId("buyer-1", "key-1");
+    }
+
+    @Test
+    void checkout_rejectsAKeyLongerThanTheColumn_beforeTouchingTheCart() {
+        String tooLong = "k".repeat(StartCheckoutUseCase.MAX_IDEMPOTENCY_KEY_LENGTH + 1);
+
+        assertThatThrownBy(() -> useCase.checkout("buyer-1", tooLong)).isInstanceOf(ValidationException.class);
+        verifyNoInteractions(cartRepositoryPort, orderRepositoryPort, eventPublisherPort);
+    }
+
+    // A key is not an excuse to checkout an empty cart: unknown key + empty cart is still CART_EMPTY.
+    @Test
+    void checkout_withAnUnknownKeyAndAnEmptyCart_isStillCartEmpty() {
+        when(cartRepositoryPort.findByBuyerIdForUpdate("buyer-1")).thenReturn(Optional.of(Cart.create("buyer-1")));
+        when(checkoutRequestRepositoryPort.findOrderId("buyer-1", "new-key")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> useCase.checkout("buyer-1", "new-key"))
+                .isInstanceOf(ConflictException.class)
+                .hasFieldOrPropertyWithValue("errorCode", "CART_EMPTY");
     }
 }

@@ -62,8 +62,11 @@ public class OrderController {
 
     @RequiresPrivilege("CHECKOUT.START")
     @PostMapping("/checkout")
-    public ResponseEntity<ApiResponse<OrderResponse>> checkout(Authentication authentication) {
-        OrderResult result = startCheckoutUseCase.checkout(buyerId(authentication));
+    public ResponseEntity<ApiResponse<OrderResponse>> checkout(
+            Authentication authentication,
+            // Optional. Same key sent again (e.g. a retry after a slow response) = same order back.
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        OrderResult result = startCheckoutUseCase.checkout(buyerId(authentication), idempotencyKey);
         return ResponseEntity.ok(ApiResponse.ok(mapper.toResponse(result)));
     }
 

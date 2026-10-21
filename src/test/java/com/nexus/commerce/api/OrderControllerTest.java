@@ -72,7 +72,7 @@ class OrderControllerTest {
     @Test
     void checkout_returns200AndUsesJwtSubjectAsBuyerId() throws Exception {
         authenticateAs("buyer-1", "CHECKOUT.START");
-        when(startCheckoutUseCase.checkout("buyer-1")).thenReturn(sampleOrder());
+        when(startCheckoutUseCase.checkout("buyer-1", null)).thenReturn(sampleOrder());
 
         mockMvc.perform(post("/api/v1/checkout").header("Authorization", "Bearer good-token"))
                 .andExpect(status().isOk())
@@ -80,9 +80,20 @@ class OrderControllerTest {
     }
 
     @Test
+    void checkout_passesTheIdempotencyKeyHeaderToTheUseCase() throws Exception {
+        authenticateAs("buyer-1", "CHECKOUT.START");
+        when(startCheckoutUseCase.checkout("buyer-1", "key-123")).thenReturn(sampleOrder());
+
+        mockMvc.perform(post("/api/v1/checkout").header("Authorization", "Bearer good-token")
+                        .header("Idempotency-Key", "key-123"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value("order-1"));
+    }
+
+    @Test
     void checkout_returns409WhenCartIsEmpty() throws Exception {
         authenticateAs("buyer-1", "CHECKOUT.START");
-        when(startCheckoutUseCase.checkout("buyer-1"))
+        when(startCheckoutUseCase.checkout("buyer-1", null))
                 .thenThrow(new ConflictException("CART_EMPTY", "Cannot checkout an empty cart"));
 
         mockMvc.perform(post("/api/v1/checkout").header("Authorization", "Bearer good-token"))

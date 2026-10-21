@@ -1,6 +1,7 @@
 package com.nexus.commerce.infrastructure.config;
 
 import com.nexus.commerce.application.port.out.CartRepositoryPort;
+import com.nexus.commerce.application.port.out.CheckoutRequestRepositoryPort;
 import com.nexus.commerce.application.port.out.EventPublisherPort;
 import com.nexus.commerce.application.port.out.OrderRepositoryPort;
 import com.nexus.commerce.application.port.out.PaymentGatewayPort;
@@ -43,9 +44,10 @@ public class UseCaseConfig {
                                                        OrderRepositoryPort orderRepositoryPort,
                                                        EventPublisherPort eventPublisherPort,
                                                        ProductSnapshotRepositoryPort productSnapshotRepositoryPort,
-                                                       ProductStockRepositoryPort productStockRepositoryPort) {
+                                                       ProductStockRepositoryPort productStockRepositoryPort,
+                                                       CheckoutRequestRepositoryPort checkoutRequestRepositoryPort) {
         return new StartCheckoutUseCase(cartRepositoryPort, orderRepositoryPort, eventPublisherPort,
-                productSnapshotRepositoryPort, productStockRepositoryPort);
+                productSnapshotRepositoryPort, productStockRepositoryPort, checkoutRequestRepositoryPort);
     }
 
     @Bean
@@ -182,5 +184,13 @@ public class UseCaseConfig {
             CartRepositoryPort cartRepositoryPort,
             @Value("${nexus.cart.max-inactive-days:30}") long maxInactiveDays) {
         return new ExpireInactiveCartsUseCase(cartRepositoryPort, java.time.Duration.ofDays(maxInactiveDays));
+    }
+
+    @Bean
+    public PurgeCheckoutRequestsUseCase purgeCheckoutRequestsUseCase(
+            CheckoutRequestRepositoryPort checkoutRequestRepositoryPort,
+            @Value("${nexus.checkout.idempotency-retention-hours:24}") long retentionHours) {
+        return new PurgeCheckoutRequestsUseCase(checkoutRequestRepositoryPort,
+                java.time.Duration.ofHours(retentionHours));
     }
 }
