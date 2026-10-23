@@ -84,4 +84,48 @@ class DeadLetterControllerTest {
                 .andExpect(jsonPath("$.data.replayed").value(3));
         verify(deadLetterService).replay(100);
     }
+
+    @Test
+    void skip_withoutPrivilege_is403_andNothingIsSkipped() throws Exception {
+        authenticateAs("seller-1", "PRODUCT.CREATE");
+
+        mockMvc.perform(post("/internal/dlt/skip").param("topic", "fulfillment-events.commerce-service.DLT")
+                        .header("Authorization", "Bearer good-token"))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(deadLetterService);
+    }
+
+    @Test
+    void skip_asAdmin_dropsOneRecordByDefault() throws Exception {
+        authenticateAs("admin-1", DeadLetterController.PRIVILEGE);
+        when(deadLetterService.skip("fulfillment-events.commerce-service.DLT", 1)).thenReturn(
+                new DeadLetterService.SkipResult("fulfillment-events.commerce-service.DLT", List.of()));
+
+        mockMvc.perform(post("/internal/dlt/skip").param("topic", "fulfillment-events.commerce-service.DLT")
+                        .header("Authorization", "Bearer good-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.deadLetterTopic").value("fulfillment-events.commerce-service.DLT"));
+        verify(deadLetterService).skip("fulfillment-events.commerce-service.DLT", 1);
+    }
+
+    @Test
+    void skip_countIsCappedAtOneHundred() throws Exception {
+        authenticateAs("admin-1", DeadLetterController.PRIVILEGE);
+        when(deadLetterService.skip(org.mockito.ArgumentMatchers.anyString(), anyInt()))
+                .thenReturn(new DeadLetterService.SkipResult("t", List.of()));
+
+        mockMvc.perform(post("/internal/dlt/skip").param("topic", "t").param("count", "100000")
+                        .header("Authorization", "Bearer good-token"))
+                .andExpect(status().isOk());
+        verify(deadLetterService).skip("t", 100);
+    }
+
+    @Test
+    void skip_requiresTheTopicParameter() throws Exception {
+        authenticateAs("admin-1", DeadLetterController.PRIVILEGE);
+
+        mockMvc.perform(post("/internal/dlt/skip").header("Authorization", "Bearer good-token"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(deadLetterService);
+    }
 }
