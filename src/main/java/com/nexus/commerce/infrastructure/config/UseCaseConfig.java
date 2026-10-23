@@ -137,8 +137,9 @@ public class UseCaseConfig {
     }
 
     @Bean
-    public MarkOrderShippedUseCase markOrderShippedUseCase(OrderRepositoryPort orderRepositoryPort) {
-        return new MarkOrderShippedUseCase(orderRepositoryPort);
+    public MarkOrderShippedUseCase markOrderShippedUseCase(OrderRepositoryPort orderRepositoryPort,
+                                                           EventPublisherPort eventPublisherPort) {
+        return new MarkOrderShippedUseCase(orderRepositoryPort, eventPublisherPort);
     }
 
     @Bean
