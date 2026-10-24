@@ -187,4 +187,31 @@ class OrderRepositoryAdapterTest {
         Order reloaded = adapter.findById(order.getId()).orElseThrow();
         assertThat(reloaded.getShippedAt()).isCloseTo(shippedAt, within(1, java.time.temporal.ChronoUnit.MILLIS));
     }
+
+    // ---- chk_orders_status (V11): the database itself refuses an unknown status
+
+    @Test
+    void everyOrderStatusOfTheEnum_isAcceptedByTheCheckConstraint() {
+        // Guards the day someone adds a value to OrderStatus without widening the constraint.
+        for (OrderStatus status : OrderStatus.values()) {
+            Order order = orderCreatedAt(Instant.now(), null, status);
+
+            adapter.save(order);
+            entityManager.flush();
+            entityManager.clear();
+
+            assertThat(adapter.findById(order.getId()).orElseThrow().getStatus()).isEqualTo(status);
+        }
+    }
+
+    @Test
+    void anUnknownStatus_isRefusedByTheDatabase() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> {
+            entityManager.getEntityManager().createNativeQuery(
+                            "insert into orders (id, buyer_id, total_amount, status, created_at) "
+                                    + "values (gen_random_uuid(), 'buyer-1', 10, 'PAIDD', now())")
+                    .executeUpdate();
+            entityManager.flush();
+        }).hasMessageContaining("chk_orders_status");
+    }
 }
