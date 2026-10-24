@@ -48,6 +48,9 @@ nexus:
       # whsec_... (Stripe dashboard, or printed by `stripe listen`). Blank = webhook rejects all calls.
       webhook-secret: ${STRIPE_WEBHOOK_SECRET:}
   checkout:
+    # Where Stripe may send the buyer back to (successUrl / cancelUrl must be on one of these origins).
+    # Comma-separated scheme://host[:port]; set it to the real front-end origin when deploying.
+    allowed-redirect-origins: http://localhost:5173,http://localhost:3000
     # An Idempotency-Key is remembered this long (a retry within it gets the same order back).
     idempotency-retention-hours: 24
   cart:

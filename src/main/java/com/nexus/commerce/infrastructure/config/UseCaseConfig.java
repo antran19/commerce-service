@@ -74,8 +74,16 @@ public class UseCaseConfig {
 
     @Bean
     public CreateCheckoutSessionUseCase createCheckoutSessionUseCase(OrderRepositoryPort orderRepositoryPort,
-                                                                       PaymentGatewayPort paymentGatewayPort) {
-        return new CreateCheckoutSessionUseCase(orderRepositoryPort, paymentGatewayPort);
+                                                                       PaymentGatewayPort paymentGatewayPort,
+                                                                       RedirectUrlPolicy redirectUrlPolicy) {
+        return new CreateCheckoutSessionUseCase(orderRepositoryPort, paymentGatewayPort, redirectUrlPolicy);
+    }
+
+    // Comma-separated origins of the front end (scheme://host[:port]); the default is the Vite dev server.
+    @Bean
+    public RedirectUrlPolicy redirectUrlPolicy(
+            @Value("${nexus.checkout.allowed-redirect-origins:http://localhost:5173,http://localhost:3000}") String origins) {
+        return new RedirectUrlPolicy(java.util.Arrays.asList(origins.split(",")));
     }
 
     @Bean

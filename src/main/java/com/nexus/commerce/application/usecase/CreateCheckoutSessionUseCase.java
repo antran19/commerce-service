@@ -14,15 +14,22 @@ public class CreateCheckoutSessionUseCase {
 
     private final OrderRepositoryPort orderRepositoryPort;
     private final PaymentGatewayPort paymentGatewayPort;
+    private final RedirectUrlPolicy redirectUrlPolicy;
 
     public CreateCheckoutSessionUseCase(OrderRepositoryPort orderRepositoryPort,
-                                         PaymentGatewayPort paymentGatewayPort) {
+                                         PaymentGatewayPort paymentGatewayPort,
+                                         RedirectUrlPolicy redirectUrlPolicy) {
         this.orderRepositoryPort = orderRepositoryPort;
         this.paymentGatewayPort = paymentGatewayPort;
+        this.redirectUrlPolicy = redirectUrlPolicy;
     }
 
     public PaymentGatewayPort.CheckoutSession createSession(String orderId, String callerId,
                                                              String successUrl, String cancelUrl) {
+        // Before anything else: these addresses go to Stripe and decide where the buyer lands.
+        redirectUrlPolicy.requireAllowed("successUrl", successUrl);
+        redirectUrlPolicy.requireAllowed("cancelUrl", cancelUrl);
+
         Order order = orderRepositoryPort.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
 
