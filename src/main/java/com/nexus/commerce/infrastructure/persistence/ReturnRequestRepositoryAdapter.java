@@ -37,6 +37,11 @@ public class ReturnRequestRepositoryAdapter implements ReturnRequestRepositoryPo
     }
 
     @Override
+    public List<ReturnRequest> findByStatus(ReturnRequestStatus status) {
+        return jpaRepository.findByStatusOrderByCreatedAtDesc(status.name()).stream().map(this::toDomain).toList();
+    }
+
+    @Override
     public ReturnRequest save(ReturnRequest returnRequest) {
         ReturnRequestJpaEntity entity = new ReturnRequestJpaEntity(UUID.fromString(returnRequest.getId()),
                 UUID.fromString(returnRequest.getOrderId()), returnRequest.getReason(),

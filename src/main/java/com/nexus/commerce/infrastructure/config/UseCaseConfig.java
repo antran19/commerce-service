@@ -141,6 +141,11 @@ public class UseCaseConfig {
     }
 
     @Bean
+    public ListReturnRequestsUseCase listReturnRequestsUseCase(ReturnRequestRepositoryPort returnRequestRepositoryPort) {
+        return new ListReturnRequestsUseCase(returnRequestRepositoryPort);
+    }
+
+    @Bean
     public ListOrdersSellingUseCase listOrdersSellingUseCase(OrderRepositoryPort orderRepositoryPort) {
         return new ListOrdersSellingUseCase(orderRepositoryPort);
     }

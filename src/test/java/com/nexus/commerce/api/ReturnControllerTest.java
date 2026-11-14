@@ -2,9 +2,11 @@ package com.nexus.commerce.api;
 
 import com.nexus.commerce.api.mapper.CommerceApiMapperImpl;
 import com.nexus.commerce.application.usecase.CreateReturnRequestUseCase;
+import com.nexus.commerce.application.usecase.ListReturnRequestsUseCase;
 import com.nexus.commerce.application.usecase.ReceiveReturnUseCase;
 import com.nexus.commerce.application.usecase.RejectReturnUseCase;
 import com.nexus.commerce.application.usecase.ReturnRequestResult;
+import com.nexus.commerce.domain.model.ReturnRequestStatus;
 import com.nexus.commerce.infrastructure.config.SecurityConfig;
 import com.nexus.common.core.exception.ConflictException;
 import com.nexus.common.security.JwtAuthenticationFilter;
@@ -25,8 +27,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.Instant;
 import java.util.List;
 
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -42,6 +47,7 @@ class ReturnControllerTest {
     @MockBean private CreateReturnRequestUseCase createReturnRequestUseCase;
     @MockBean private ReceiveReturnUseCase receiveReturnUseCase;
     @MockBean private RejectReturnUseCase rejectReturnUseCase;
+    @MockBean private ListReturnRequestsUseCase listReturnRequestsUseCase;
     @MockBean private JwtTokenProvider jwtTokenProvider;
 
     private void authenticateAs(String subject, String... privileges) {
@@ -52,6 +58,51 @@ class ReturnControllerTest {
 
     private ReturnRequestResult sampleResult(String status) {
         return new ReturnRequestResult("return-1", "order-1", "Wrong item", status, Instant.now(), null, null);
+    }
+
+    @Test
+    void listReturnRequests_defaultsToTheOnesWaitingForAnAnswer() throws Exception {
+        authenticateAs("admin-1", "ORDER.REFUND");
+        when(listReturnRequestsUseCase.list(ReturnRequestStatus.REQUESTED)).thenReturn(List.of(sampleResult("REQUESTED")));
+
+        mockMvc.perform(get("/api/v1/returns").header("Authorization", "Bearer good-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value("return-1"))
+                .andExpect(jsonPath("$.data[0].orderId").value("order-1"))
+                .andExpect(jsonPath("$.data[0].status").value("REQUESTED"));
+    }
+
+    @Test
+    void listReturnRequests_takesTheStatusFromTheQuery() throws Exception {
+        authenticateAs("admin-1", "ORDER.REFUND");
+        when(listReturnRequestsUseCase.list(ReturnRequestStatus.RECEIVED)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/returns?status=RECEIVED").header("Authorization", "Bearer good-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isEmpty());
+        verify(listReturnRequestsUseCase).list(ReturnRequestStatus.RECEIVED);
+    }
+
+    @Test
+    void listReturnRequests_isRefusedWithoutTheRefundPrivilege() throws Exception {
+        authenticateAs("buyer-1", "ORDER.VIEW");
+
+        mockMvc.perform(get("/api/v1/returns").header("Authorization", "Bearer good-token"))
+                .andExpect(status().isForbidden());
+        verify(listReturnRequestsUseCase, never()).list(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void listReturnRequests_needsAToken() throws Exception {
+        mockMvc.perform(get("/api/v1/returns")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void listReturnRequests_rejectsAStatusThatDoesNotExist() throws Exception {
+        authenticateAs("admin-1", "ORDER.REFUND");
+
+        mockMvc.perform(get("/api/v1/returns?status=NOPE").header("Authorization", "Bearer good-token"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

@@ -63,6 +63,24 @@ class ReturnRequestRepositoryAdapterTest {
     }
 
     @Test
+    void findByStatus_returnsOnlyThatStatus_newestFirst() throws InterruptedException {
+        ReturnRequest older = ReturnRequest.create(persistOrder(), "Older, still waiting");
+        adapter.save(older);
+        Thread.sleep(5);
+        ReturnRequest newer = ReturnRequest.create(persistOrder(), "Newer, still waiting");
+        adapter.save(newer);
+        ReturnRequest answered = ReturnRequest.create(persistOrder(), "Already answered");
+        adapter.save(answered.receive("admin-1"));
+
+        List<ReturnRequest> waiting = adapter.findByStatus(ReturnRequestStatus.REQUESTED);
+        List<ReturnRequest> received = adapter.findByStatus(ReturnRequestStatus.RECEIVED);
+
+        assertThat(waiting).extracting(ReturnRequest::getId).containsExactly(newer.getId(), older.getId());
+        assertThat(received).extracting(ReturnRequest::getId).containsExactly(answered.getId());
+        assertThat(adapter.findByStatus(ReturnRequestStatus.REJECTED)).isEmpty();
+    }
+
+    @Test
     void save_persistsReceivedResolution() {
         String orderId = persistOrder();
         ReturnRequest returnRequest = ReturnRequest.create(orderId, "Wrong item received");

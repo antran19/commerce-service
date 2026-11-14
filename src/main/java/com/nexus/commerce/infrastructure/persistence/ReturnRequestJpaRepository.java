@@ -18,4 +18,6 @@ public interface ReturnRequestJpaRepository extends JpaRepository<ReturnRequestJ
     Optional<ReturnRequestJpaEntity> findByIdForUpdate(@Param("id") UUID id);
 
     List<ReturnRequestJpaEntity> findByOrderId(UUID orderId);
+
+    List<ReturnRequestJpaEntity> findByStatusOrderByCreatedAtDesc(String status);
 }
