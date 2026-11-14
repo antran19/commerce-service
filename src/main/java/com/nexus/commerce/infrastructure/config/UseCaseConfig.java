@@ -68,8 +68,9 @@ public class UseCaseConfig {
 
     @Bean
     public CreateOrderFromAuctionUseCase createOrderFromAuctionUseCase(OrderRepositoryPort orderRepositoryPort,
-                                                                        EventPublisherPort eventPublisherPort) {
-        return new CreateOrderFromAuctionUseCase(orderRepositoryPort, eventPublisherPort);
+                                                                        EventPublisherPort eventPublisherPort,
+                                                                        ProductSnapshotRepositoryPort productSnapshotRepositoryPort) {
+        return new CreateOrderFromAuctionUseCase(orderRepositoryPort, eventPublisherPort, productSnapshotRepositoryPort);
     }
 
     @Bean

@@ -2,8 +2,10 @@ package com.nexus.commerce.application.usecase;
 
 import com.nexus.commerce.application.port.out.EventPublisherPort;
 import com.nexus.commerce.application.port.out.OrderRepositoryPort;
+import com.nexus.commerce.application.port.out.ProductSnapshotRepositoryPort;
 import com.nexus.commerce.domain.model.Order;
 import com.nexus.commerce.domain.model.OrderItem;
+import com.nexus.commerce.domain.model.ProductSnapshot;
 import com.nexus.common.events.InventoryReservationRequestedEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,13 +23,16 @@ class CreateOrderFromAuctionUseCaseTest {
 
     private OrderRepositoryPort orderRepositoryPort;
     private EventPublisherPort eventPublisherPort;
+    private ProductSnapshotRepositoryPort productSnapshotRepositoryPort;
     private CreateOrderFromAuctionUseCase useCase;
 
     @BeforeEach
     void setUp() {
         orderRepositoryPort = mock(OrderRepositoryPort.class);
         eventPublisherPort = mock(EventPublisherPort.class);
-        useCase = new CreateOrderFromAuctionUseCase(orderRepositoryPort, eventPublisherPort);
+        productSnapshotRepositoryPort = mock(ProductSnapshotRepositoryPort.class);
+        when(productSnapshotRepositoryPort.findById(any())).thenReturn(Optional.empty());
+        useCase = new CreateOrderFromAuctionUseCase(orderRepositoryPort, eventPublisherPort, productSnapshotRepositoryPort);
         when(orderRepositoryPort.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
     }
 
@@ -42,6 +47,29 @@ class CreateOrderFromAuctionUseCaseTest {
         assertThat(result.buyerId()).isEqualTo("winner-1");
         assertThat(result.totalAmount()).isEqualByComparingTo("150.00");
         verify(eventPublisherPort, times(1)).publish(any());
+    }
+
+    @Test
+    void createFromAuction_namesTheOrderLineAfterTheProduct_whenTheCatalogCopyKnowsIt() {
+        when(orderRepositoryPort.findByAuctionId("auction-1")).thenReturn(Optional.empty());
+        when(productSnapshotRepositoryPort.findById("product-1")).thenReturn(Optional.of(
+                ProductSnapshot.create("product-1", "seller-1", "Ví da Nexus", new BigDecimal("320000"))));
+
+        OrderResult result = useCase.createFromAuction("auction-1", "product-1", "seller-1",
+                "winner-1", new BigDecimal("150.00"));
+
+        assertThat(result.items()).hasSize(1);
+        assertThat(result.items().get(0).productName()).isEqualTo("Ví da Nexus");
+    }
+
+    @Test
+    void createFromAuction_fallsBackToAGenericLabel_whenTheCatalogCopyDoesNotKnowTheProduct() {
+        when(orderRepositoryPort.findByAuctionId("auction-1")).thenReturn(Optional.empty());
+
+        OrderResult result = useCase.createFromAuction("auction-1", "product-1", "seller-1",
+                "winner-1", new BigDecimal("150.00"));
+
+        assertThat(result.items().get(0).productName()).isEqualTo("Auction item product-1");
     }
 
     @Test
